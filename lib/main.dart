@@ -42,9 +42,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
 
   final List<Map<String, dynamic>> _products = [
-    {'id': '1', 'name': 'สินค้าตัวอย่าง A', 'price': 99.0, 'quantity': 50, 'unit': 'ชิ้น'},
-    {'id': '2', 'name': 'สินค้าตัวอย่าง B', 'price': 150.0, 'quantity': 30, 'unit': 'กล่อง'},
-    {'id': '3', 'name': 'สินค้าตัวอย่าง C', 'price': 299.0, 'quantity': 15, 'unit': 'ชุด'},
+    // {'id': '1', 'name': 'สินค้าตัวอย่าง A', 'price': 99.0, 'quantity': 50, 'unit': 'ชิ้น'},
+    // {'id': '2', 'name': 'สินค้าตัวอย่าง B', 'price': 150.0, 'quantity': 30, 'unit': 'กล่อง'},
+    // {'id': '3', 'name': 'สินค้าตัวอย่าง C', 'price': 299.0, 'quantity': 15, 'unit': 'ชุด'},
   ];
 
   void _addProduct(Map<String, dynamic> product) {
