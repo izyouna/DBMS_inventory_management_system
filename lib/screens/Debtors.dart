@@ -7,9 +7,9 @@ class DebtorsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final debtors = [
-      {'name': 'คุณสมชาย ใจดี', 'amount': 1500.0, 'days': 3},
-      {'name': 'คุณสมหญิง รักสวย', 'amount': 3200.0, 'days': 7},
-      {'name': 'ร้านค้าตัวอย่าง', 'amount': 850.0, 'days': 1},
+      // {'name': 'คุณสมชาย ใจดี', 'amount': 1500.0, 'days': 3},
+      // {'name': 'คุณสมหญิง รักสวย', 'amount': 3200.0, 'days': 7},
+      // {'name': 'ร้านค้าตัวอย่าง', 'amount': 850.0, 'days': 1},
     ];
 
     final totalDebt = debtors.fold<double>(
