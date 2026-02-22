@@ -50,8 +50,8 @@ class _MainNavScreenState extends State<MainNavScreen> {
         decoration: BoxDecoration(
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.5),
-              blurRadius: 20,
+              color: Colors.black.withOpacity(0.13),
+              blurRadius: 10,
               offset: const Offset(0, -4),
             ),
           ],
