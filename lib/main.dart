@@ -1,6 +1,7 @@
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/material.dart';
-// import 'screens/Inventory.dart';
+import 'screens/Inventory.dart';
+import 'screens/Dashboard.dart';
 
 void main() {
   runApp(const InventoryApp());
@@ -37,15 +38,14 @@ class MainNavScreen extends StatefulWidget {
 
 class _MainNavScreenState extends State<MainNavScreen> {
   int _currentindex = 0;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // body: IndexedStack(
-      //   index: _currentindex,
-      //   children: [
-      //     const InventoryScreen(),
-      //     ],
-      // ),
+      body: IndexedStack(
+        index: _currentindex,
+        children: [const DashboardScreen(), const InventoryScreen()],
+      ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           boxShadow: [
@@ -61,10 +61,10 @@ class _MainNavScreenState extends State<MainNavScreen> {
           onTap: (index) => setState(() => _currentindex = index),
           type: BottomNavigationBarType.fixed,
           backgroundColor: Colors.white,
-          
+
           selectedItemColor: Colors.black,
           unselectedItemColor: Colors.grey,
-          
+
           unselectedLabelStyle: const TextStyle(
             fontWeight: FontWeight.w600,
             fontSize: 12,
@@ -73,26 +73,20 @@ class _MainNavScreenState extends State<MainNavScreen> {
             fontWeight: FontWeight.w600,
             fontSize: 15,
           ),
-          
-          selectedIconTheme: const  IconThemeData(
-            size: 35,
-            color: Colors.amber,
 
-          ),
-          unselectedIconTheme: const IconThemeData(
-            size: 24,
-          ),
+          selectedIconTheme: const IconThemeData(size: 35, color: Colors.amber),
+          unselectedIconTheme: const IconThemeData(size: 24),
 
           items: [
             BottomNavigationBarItem(
               icon: Icon(Icons.dashboard_outlined),
               activeIcon: Container(
-                padding: const EdgeInsets.all(8), 
+                padding: const EdgeInsets.all(8),
                 decoration: const BoxDecoration(
-                  color: Color.fromARGB(255, 30, 39, 54), 
+                  color: Color.fromARGB(255, 30, 39, 54),
                   shape: BoxShape.circle,
                 ),
-               child: Icon(Icons.dashboard_rounded),
+                child: Icon(Icons.dashboard_rounded),
               ),
               label: 'แดชบอร์ด',
             ),
@@ -101,7 +95,7 @@ class _MainNavScreenState extends State<MainNavScreen> {
               activeIcon: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: const BoxDecoration(
-                  color: Color.fromARGB(255, 30, 39, 54), 
+                  color: Color.fromARGB(255, 30, 39, 54),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(Icons.shopping_cart_rounded),
@@ -116,7 +110,7 @@ class _MainNavScreenState extends State<MainNavScreen> {
                   color: Color.fromARGB(255, 30, 39, 54),
                   shape: BoxShape.circle,
                 ),
-              child: Icon(Icons.indeterminate_check_box_rounded),
+                child: Icon(Icons.indeterminate_check_box_rounded),
               ),
               label: 'สินค้า',
             ),
