@@ -63,7 +63,7 @@ class _MainNavScreenState extends State<MainNavScreen> {
           backgroundColor: Colors.white,
 
           selectedItemColor: Colors.black,
-          unselectedItemColor: Colors.grey,
+          unselectedItemColor: Colors.black,
 
           unselectedLabelStyle: const TextStyle(
             fontWeight: FontWeight.w600,
