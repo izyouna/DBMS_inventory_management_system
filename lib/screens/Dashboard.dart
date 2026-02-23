@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -78,15 +79,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF0891B2),
+          brightness: Brightness.light,
+          primary: const Color(0xFF0891B2),
+        ),
+        textTheme: GoogleFonts.promptTextTheme(ThemeData.light().textTheme),
+      ),
       home: Scaffold(
         appBar: AppBar(
-          title: const Text("ร้านเกษตรภัณฑ์"),
-          backgroundColor: Colors.white,
-          titleTextStyle: TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.bold,
-            fontSize: 28,
+          title: const Text(
+            "ร้านเกษตรภัณฑ์",
+            style: TextStyle(
+              color: Colors.black,
+              fontWeight: FontWeight.bold,
+              fontSize: 28,
+            ),
           ),
+          backgroundColor: Colors.white,
         ),
         body: SingleChildScrollView(
           child: Column(

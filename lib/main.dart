@@ -16,12 +16,6 @@ class InventoryApp extends StatelessWidget {
       title: 'Inventory Management Systems',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF0891B2),
-          brightness: Brightness.light,
-          primary: const Color(0xFF0891B2),
-        ),
         textTheme: GoogleFonts.promptTextTheme(ThemeData.light().textTheme),
       ),
       home: const MainNavScreen(),
