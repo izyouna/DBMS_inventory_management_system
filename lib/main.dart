@@ -1,7 +1,12 @@
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/material.dart';
-import 'screens/Inventory.dart';
+
+import 'screens/AddProduct.dart';
 import 'screens/Dashboard.dart';
+import 'screens/Store.dart';
+import 'screens/inventory.dart';
+import 'screens/Report.dart';
+import 'screens/Setting.dart';
 
 void main() {
   runApp(const InventoryApp());
@@ -12,6 +17,13 @@ class InventoryApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // final baseTheme = ThemeData(
+    //   useMaterial3: true,
+    //   colorScheme: ColorScheme.fromSeed(
+    //     seedColor: const Color(0xFF1E2736),
+    //     brightness: Brightness.light,
+    //   ),
+    // );
     return MaterialApp(
       title: 'Inventory Management Systems',
       debugShowCheckedModeBanner: false,
@@ -31,15 +43,21 @@ class MainNavScreen extends StatefulWidget {
 }
 
 class _MainNavScreenState extends State<MainNavScreen> {
-  int _currentindex = 0;
+  int _currentIndex = 0;
+
+  final List<Widget> _screens = const [
+    DashboardScreen(),
+    StoreScreen(),
+    InventoryScreen(),
+    AddProductScreen(),
+    ReportScreen(),
+    SettingScreen(),
+  ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: _currentindex,
-        children: [const DashboardScreen(), const InventoryScreen()],
-      ),
+      body: IndexedStack(index: _currentIndex, children: _screens),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           boxShadow: [
@@ -51,14 +69,12 @@ class _MainNavScreenState extends State<MainNavScreen> {
           ],
         ),
         child: BottomNavigationBar(
-          currentIndex: _currentindex,
-          onTap: (index) => setState(() => _currentindex = index),
+          currentIndex: _currentIndex,
+          onTap: (index) => setState(() => _currentIndex = index),
           type: BottomNavigationBarType.fixed,
           backgroundColor: Colors.white,
-
           selectedItemColor: Colors.black,
           unselectedItemColor: Colors.black,
-
           unselectedLabelStyle: const TextStyle(
             fontWeight: FontWeight.w600,
             fontSize: 12,
@@ -107,6 +123,18 @@ class _MainNavScreenState extends State<MainNavScreen> {
                 child: Icon(Icons.indeterminate_check_box_rounded),
               ),
               label: 'สินค้า',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.stacked_bar_chart_outlined),
+              activeIcon: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: const BoxDecoration(
+                  color: Color.fromARGB(255, 30, 39, 54),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.stacked_bar_chart_rounded),
+              ),
+              label: 'เพิ่มสินค้า',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.auto_graph_outlined),
