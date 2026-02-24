@@ -49,7 +49,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
           style: GoogleFonts.prompt(
             color: Colors.black,
             fontWeight: FontWeight.bold,
-            fontSize: 20,
+            fontSize: 24,
           ),
         ),
       ),

@@ -303,7 +303,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
           style: GoogleFonts.prompt(
             color: Colors.black,
             fontWeight: FontWeight.bold,
-            fontSize: 20,
+            fontSize: 24,
           ),
         ),
         // actions: [
