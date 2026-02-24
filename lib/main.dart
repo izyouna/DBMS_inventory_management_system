@@ -1,6 +1,8 @@
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import 'providers/product_provider.dart';
 import 'screens/AddProduct.dart';
 import 'screens/Dashboard.dart';
 import 'screens/Store.dart';
@@ -9,7 +11,12 @@ import 'screens/Report.dart';
 import 'screens/Setting.dart';
 
 void main() {
-  runApp(const InventoryApp());
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => ProductProvider(),
+      child: const InventoryApp(),
+    ),
+  );
 }
 
 class InventoryApp extends StatelessWidget {
@@ -17,13 +24,6 @@ class InventoryApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // final baseTheme = ThemeData(
-    //   useMaterial3: true,
-    //   colorScheme: ColorScheme.fromSeed(
-    //     seedColor: const Color(0xFF1E2736),
-    //     brightness: Brightness.light,
-    //   ),
-    // );
     return MaterialApp(
       title: 'Inventory Management Systems',
       debugShowCheckedModeBanner: false,
