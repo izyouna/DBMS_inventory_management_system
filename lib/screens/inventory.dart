@@ -306,13 +306,13 @@ class _InventoryScreenState extends State<InventoryScreen> {
             fontSize: 20,
           ),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.search),
-            color: Colors.black,
-            onPressed: () {},
-          ),
-        ],
+        // actions: [
+        //   IconButton(
+        //     icon: const Icon(Icons.search),
+        //     color: Colors.black,
+        //     onPressed: () {},
+        //   ),
+        // ],
       ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: const Color(0xFF1E2736),

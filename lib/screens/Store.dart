@@ -89,13 +89,13 @@ class _StoreScreenState extends State<StoreScreen> {
             fontSize: 20,
           ),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.search),
-            color: Colors.black,
-            onPressed: () {},
-          ),
-        ],
+        // actions: [
+        //   IconButton(
+        //     icon: const Icon(Icons.search),
+        //     color: Colors.black,
+        //     onPressed: () {},
+        //   ),
+        // ],
       ),
       body: Column(
         children: [
