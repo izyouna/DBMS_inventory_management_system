@@ -86,35 +86,17 @@ class ProductProvider with ChangeNotifier {
 
   void deleteProduct(String id) {
     _products.removeWhere((p) => p.id == id);
-    _cart.remove(id);
     notifyListeners();
   }
 
-  void addToCart(String productId) {
-    _cart[productId] = (_cart[productId] ?? 0) + 1;
-    notifyListeners();
-  }
-
-  void removeFromCart(String productId) {
-    if (_cart.containsKey(productId)) {
-      if (_cart[productId]! > 1) {
-        _cart[productId] = _cart[productId]! - 1;
-      } else {
-        _cart.remove(productId);
-      }
+  void reduceStock(String productId, int quantity) {
+    final index = _products.indexWhere((p) => p.id == productId);
+    if (index != -1) {
+      _products[index].stock -= quantity;
+      if (_products[index].stock < 0) _products[index].stock = 0;
       notifyListeners();
     }
   }
 
-  double get totalAmount {
-    double total = 0.0;
-    _cart.forEach((id, qty) {
-      final product = _products.firstWhere((p) => p.id == id);
-      total += product.price * qty;
-    });
-    return total;
-  }
-
-  int get cartCount => _cart.values.fold(0, (sum, qty) => sum + qty);
   int get lowStockCount => _products.where((p) => p.isLowStock).length;
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
+import '../providers/product_provider.dart';
 import '../models/cart_item.dart';
 import '../models/order.dart';
 import '../models/customer.dart';
@@ -166,6 +167,8 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   void _processCheckout(BuildContext context, CartProvider cart, PaymentMethod method) {
+    final productProvider = Provider.of<ProductProvider>(context, listen: false);
+
     // Validation: ถ้าเป็นขายเชื่อ ต้องมีข้อมูลลูกค้า
     if (method is CreditPayment && (_nameController.text.isEmpty || _phoneController.text.isEmpty)) {
       Navigator.pop(context);
@@ -185,6 +188,11 @@ class _CartScreenState extends State<CartScreen> {
         name: _nameController.text.trim(),
         phone: _phoneController.text.trim(),
       );
+    }
+
+    // ตัดสต็อกสินค้าก่อนทำรายการสำเร็จ
+    for (var item in cart.items.values) {
+      productProvider.reduceStock(item.product.id, item.quantity);
     }
 
     final order = cart.checkout(method, customer: customer);

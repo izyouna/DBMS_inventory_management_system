@@ -68,6 +68,23 @@ class StoreItemCard extends StatelessWidget {
               color: const Color(0xFF1E2736),
             ),
           ),
+          const SizedBox(height: 2),
+          product.stock == 0
+              ? Text(
+                  'ของหมด',
+                  style: GoogleFonts.prompt(
+                    fontSize: 12,
+                    color: Colors.red,
+                    fontWeight: FontWeight.bold,
+                  ),
+                )
+              : Text(
+                  'คงเหลือ: ${product.stock}',
+                  style: GoogleFonts.prompt(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                  ),
+                ),
           const SizedBox(height: 4),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -87,16 +104,18 @@ class StoreItemCard extends StatelessWidget {
                     IconButton(
                       padding: EdgeInsets.zero,
                       icon: const Icon(Icons.add_circle_outline, size: 20),
-                      onPressed: onAdd,
+                      onPressed: product.stock <= inCart ? null : onAdd,
                     ),
                   ],
                 )
               else
                 TextButton(
-                  onPressed: onAdd,
+                  onPressed: product.stock == 0 ? null : onAdd,
                   style: TextButton.styleFrom(
                     foregroundColor: Colors.white,
-                    backgroundColor: const Color.fromARGB(255, 30, 39, 54),
+                    backgroundColor: product.stock == 0
+                        ? Colors.grey
+                        : const Color.fromARGB(255, 30, 39, 54),
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
