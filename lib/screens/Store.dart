@@ -24,19 +24,6 @@ class _StoreScreenState extends State<StoreScreen> {
         final List<String> categoryFilterLabels = ['ทั้งหมด'];
         categoryFilterLabels.addAll(provider.categories.map((c) => c.label));
 
-<<<<<<< HEAD
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F6FA),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        title: Text(
-          'ขายสินค้า',
-          style: GoogleFonts.prompt(
-            color: Colors.black,
-            fontWeight: FontWeight.bold,
-            fontSize: 24,
-=======
         final filtered = products.where((p) {
           final matchesSearch = p.name.toLowerCase().contains(_search.toLowerCase());
           final matchesCat = _selectedCategoryLabel == 'ทั้งหมด' ? true : p.category.label == _selectedCategoryLabel;
@@ -49,7 +36,6 @@ class _StoreScreenState extends State<StoreScreen> {
             backgroundColor: Colors.white,
             elevation: 0,
             title: Text('ขายสินค้า', style: GoogleFonts.prompt(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 20)),
->>>>>>> origin/bigb
           ),
           body: Column(
             children: [

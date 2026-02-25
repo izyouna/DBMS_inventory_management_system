@@ -60,7 +60,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-<<<<<<< HEAD
         title: Text(
           'เพิ่มสินค้าใหม่',
           style: GoogleFonts.prompt(
@@ -69,9 +68,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
             fontSize: 24,
           ),
         ),
-=======
-        title: Text('เพิ่มสินค้าใหม่', style: GoogleFonts.prompt(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 20)),
->>>>>>> origin/bigb
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
