@@ -22,11 +22,46 @@ class ProductProvider with ChangeNotifier {
 
   ProductProvider() {
     _products = [
-      Product(id: '1', name: 'ปุ๋ยอินทรีย์ 50kg', price: 450.0, stock: 10, unit: _units[1], category: _categories[0]),
-      Product(id: '2', name: 'ยาฆ่าแมลง 1L', price: 250.0, stock: 3, unit: _units[2], category: _categories[1]),
-      Product(id: '3', name: 'เมล็ดข้าวโพด 5kg', price: 320.0, stock: 20, unit: _units[4], category: _categories[2]),
-      Product(id: '4', name: 'เมล็ดข้าวหอมมะลิ 5kg', price: 350.0, stock: 15, unit: _units[4], category: _categories[2]),
-      Product(id: '5', name: 'อุปกรณ์ฉีดพ่น', price: 890.0, stock: 5, unit: _units[0], category: _categories[3]),
+      Product(
+        id: '1',
+        name: 'ปุ๋ยอินทรีย์ 50kg',
+        price: 450.0,
+        stock: 10,
+        unit: _units[1],
+        category: _categories[0],
+      ),
+      Product(
+        id: '2',
+        name: 'ยาฆ่าแมลง 1L',
+        price: 250.0,
+        stock: 3,
+        unit: _units[2],
+        category: _categories[1],
+      ),
+      Product(
+        id: '3',
+        name: 'เมล็ดข้าวโพด 5kg',
+        price: 320.0,
+        stock: 20,
+        unit: _units[4],
+        category: _categories[2],
+      ),
+      Product(
+        id: '4',
+        name: 'เมล็ดข้าวหอมมะลิ 5kg',
+        price: 350.0,
+        stock: 15,
+        unit: _units[4],
+        category: _categories[2],
+      ),
+      Product(
+        id: '5',
+        name: 'อุปกรณ์ฉีดพ่น',
+        price: 890.0,
+        stock: 5,
+        unit: _units[0],
+        category: _categories[3],
+      ),
     ];
   }
 

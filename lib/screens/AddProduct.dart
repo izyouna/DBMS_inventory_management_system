@@ -16,7 +16,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
   final _nameController = TextEditingController();
   final _stockController = TextEditingController();
   final _priceController = TextEditingController();
-  
+
   ProductUnit? _selectedUnit;
   ProductCategory? _selectedCategory;
 
@@ -25,7 +25,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
     super.initState();
     final provider = Provider.of<ProductProvider>(context, listen: false);
     if (provider.units.isNotEmpty) _selectedUnit = provider.units[0];
-    if (provider.categories.isNotEmpty) _selectedCategory = provider.categories[0];
+    if (provider.categories.isNotEmpty)
+      _selectedCategory = provider.categories[0];
   }
 
   @override
@@ -37,7 +38,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
   }
 
   void _submit() {
-    if (!_formKey.currentState!.validate() || _selectedUnit == null || _selectedCategory == null) return;
+    if (!_formKey.currentState!.validate() ||
+        _selectedUnit == null ||
+        _selectedCategory == null)
+      return;
 
     final product = Product(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -78,32 +82,88 @@ class _AddProductScreenState extends State<AddProductScreen> {
             children: [
               Container(
                 padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))]),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('ข้อมูลสินค้า', style: GoogleFonts.prompt(fontSize: 16, fontWeight: FontWeight.w600)),
+                    Text(
+                      'ข้อมูลสินค้า',
+                      style: GoogleFonts.prompt(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                     const SizedBox(height: 16),
-                    TextFormField(controller: _nameController, decoration: _inputDecoration('ชื่อสินค้า'), validator: (v) => (v == null || v.trim().isEmpty) ? 'กรุณากรอกชื่อสินค้า' : null),
+                    TextFormField(
+                      controller: _nameController,
+                      decoration: _inputDecoration('ชื่อสินค้า'),
+                      validator: (v) => (v == null || v.trim().isEmpty)
+                          ? 'กรุณากรอกชื่อสินค้า'
+                          : null,
+                    ),
                     const SizedBox(height: 20),
                     Row(
                       children: [
-                        Expanded(child: TextFormField(controller: _stockController, keyboardType: TextInputType.number, decoration: _inputDecoration('จำนวน'), validator: (v) => (v == null || int.tryParse(v) == null) ? 'ระบุตัวเลข' : null)),
+                        Expanded(
+                          child: TextFormField(
+                            controller: _stockController,
+                            keyboardType: TextInputType.number,
+                            decoration: _inputDecoration('จำนวน'),
+                            validator: (v) =>
+                                (v == null || int.tryParse(v) == null)
+                                ? 'ระบุตัวเลข'
+                                : null,
+                          ),
+                        ),
                         const SizedBox(width: 16),
-                        Expanded(child: TextFormField(controller: _priceController, keyboardType: TextInputType.number, decoration: _inputDecoration('ราคาขาย'), validator: (v) => (v == null || double.tryParse(v) == null) ? 'ระบุตัวเลข' : null)),
+                        Expanded(
+                          child: TextFormField(
+                            controller: _priceController,
+                            keyboardType: TextInputType.number,
+                            decoration: _inputDecoration('ราคาขาย'),
+                            validator: (v) =>
+                                (v == null || double.tryParse(v) == null)
+                                ? 'ระบุตัวเลข'
+                                : null,
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 20),
                     DropdownButtonFormField<ProductCategory>(
                       value: _selectedCategory,
-                      items: provider.categories.map((c) => DropdownMenuItem(value: c, child: Text(c.label, style: GoogleFonts.prompt()))).toList(),
+                      items: provider.categories
+                          .map(
+                            (c) => DropdownMenuItem(
+                              value: c,
+                              child: Text(c.label, style: GoogleFonts.prompt()),
+                            ),
+                          )
+                          .toList(),
                       onChanged: (v) => setState(() => _selectedCategory = v),
                       decoration: _inputDecoration('หมวดหมู่'),
                     ),
                     const SizedBox(height: 20),
                     DropdownButtonFormField<ProductUnit>(
                       value: _selectedUnit,
-                      items: provider.units.map((u) => DropdownMenuItem(value: u, child: Text(u.label, style: GoogleFonts.prompt()))).toList(),
+                      items: provider.units
+                          .map(
+                            (u) => DropdownMenuItem(
+                              value: u,
+                              child: Text(u.label, style: GoogleFonts.prompt()),
+                            ),
+                          )
+                          .toList(),
                       onChanged: (v) => setState(() => _selectedUnit = v),
                       decoration: _inputDecoration('หน่วย'),
                     ),
@@ -112,11 +172,24 @@ class _AddProductScreenState extends State<AddProductScreen> {
               ),
               const SizedBox(height: 24),
               SizedBox(
-                width: double.infinity, height: 52,
+                width: double.infinity,
+                height: 52,
                 child: ElevatedButton(
                   onPressed: _submit,
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1E2736), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
-                  child: Text('บันทึกสินค้า', style: GoogleFonts.prompt(fontSize: 16, fontWeight: FontWeight.w600)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1E2736),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  child: Text(
+                    'บันทึกสินค้า',
+                    style: GoogleFonts.prompt(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -126,5 +199,14 @@ class _AddProductScreenState extends State<AddProductScreen> {
     );
   }
 
-  InputDecoration _inputDecoration(String hint) => InputDecoration(hintText: hint, filled: true, fillColor: Colors.grey[50], border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none), contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14));
+  InputDecoration _inputDecoration(String hint) => InputDecoration(
+    hintText: hint,
+    filled: true,
+    fillColor: Colors.grey[50],
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: BorderSide.none,
+    ),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+  );
 }

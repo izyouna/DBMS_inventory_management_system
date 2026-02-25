@@ -75,15 +75,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(20),
-                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   height: 320,
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(20),
                     boxShadow: [
                       BoxShadow(
-                        color:
-                            const Color.fromARGB(255, 39, 39, 39).withOpacity(0.1),
+                        color: const Color.fromARGB(
+                          255,
+                          39,
+                          39,
+                          39,
+                        ).withOpacity(0.1),
                         blurRadius: 8,
                         spreadRadius: 2,
                       ),
@@ -113,9 +120,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         child: Center(
                           child: Text(
                             'กราฟแสดงยอดขาย (placeholder)',
-                            style: GoogleFonts.prompt(
-                              color: Colors.grey[500],
-                            ),
+                            style: GoogleFonts.prompt(color: Colors.grey[500]),
                           ),
                         ),
                       ),
