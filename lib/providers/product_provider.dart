@@ -18,6 +18,12 @@ class ProductProvider with ChangeNotifier {
     ProductUnit(id: 'u5', label: 'ถุง'),
   ];
 
+  final List<Warehouse> _warehouses = [
+    Warehouse(id: 'w1', name: 'หน้าร้าน', location: 'โซน A'),
+    Warehouse(id: 'w2', name: 'คลังสินค้าหลังร้าน', location: 'โซน B'),
+    Warehouse(id: 'w3', name: 'โรงรถ', location: 'โซน C'),
+  ];
+
   late final List<Product> _products;
 
   ProductProvider() {
@@ -29,6 +35,7 @@ class ProductProvider with ChangeNotifier {
         stock: 10,
         unit: _units[1],
         category: _categories[0],
+        warehouse: _warehouses[1],
       ),
       Product(
         id: '2',
@@ -37,6 +44,7 @@ class ProductProvider with ChangeNotifier {
         stock: 3,
         unit: _units[2],
         category: _categories[1],
+        warehouse: _warehouses[0],
       ),
       Product(
         id: '3',
@@ -45,6 +53,7 @@ class ProductProvider with ChangeNotifier {
         stock: 20,
         unit: _units[4],
         category: _categories[2],
+        warehouse: _warehouses[1],
       ),
       Product(
         id: '4',
@@ -53,6 +62,7 @@ class ProductProvider with ChangeNotifier {
         stock: 15,
         unit: _units[4],
         category: _categories[2],
+        warehouse: _warehouses[1],
       ),
       Product(
         id: '5',
@@ -61,6 +71,7 @@ class ProductProvider with ChangeNotifier {
         stock: 5,
         unit: _units[0],
         category: _categories[3],
+        warehouse: _warehouses[2],
       ),
     ];
   }
@@ -68,8 +79,18 @@ class ProductProvider with ChangeNotifier {
   List<Product> get products => [..._products];
   List<ProductCategory> get categories => [..._categories];
   List<ProductUnit> get units => [..._units];
+  List<Warehouse> get warehouses => [..._warehouses];
   Map<String, int> _cart = {};
   Map<String, int> get cart => {..._cart};
+
+  void addWarehouse(Warehouse warehouse) {
+    _warehouses.add(warehouse);
+    notifyListeners();
+  }
+
+  List<Product> getProductsByWarehouse(String warehouseId) {
+    return _products.where((p) => p.warehouse?.id == warehouseId).toList();
+  }
 
   void addProduct(Product product) {
     _products.add(product);

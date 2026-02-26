@@ -85,4 +85,24 @@ class CartProvider with ChangeNotifier {
     clearCart();
     return order;
   }
+
+  void payDebt(String orderId) {
+    final index = _orders.indexWhere((o) => o.id == orderId);
+    if (index != -1) {
+      // ในแอปจริงควรเปลี่ยนเป็นสร้าง Order ใหม่ หรือ Update ฐานข้อมูล
+      // แต่ในเชิง Object เราจะสร้าง copy ของ Order ที่เปลี่ยนสถานะ isPaid
+      final oldOrder = _orders[index];
+      _orders[index] = Order(
+        id: oldOrder.id,
+        items: oldOrder.items,
+        totalAmount: oldOrder.totalAmount,
+        dateTime: oldOrder.dateTime,
+        paymentMethod: 'ชำระหนี้แล้ว', // หรือระบุวิธีที่ชำระจริง
+        documentType: DocumentType.receipt,
+        isPaid: true,
+        customer: oldOrder.customer,
+      );
+      notifyListeners();
+    }
+  }
 }

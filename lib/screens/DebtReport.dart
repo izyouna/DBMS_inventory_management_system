@@ -28,18 +28,60 @@ class DebtReportScreen extends StatelessWidget {
                   child: ListTile(
                     title: Text(order.customer?.name ?? 'ไม่ระบุชื่อ', style: GoogleFonts.prompt(fontWeight: FontWeight.bold)),
                     subtitle: Text('วันที่: ${order.dateTime.toString().split('.')[0]}', style: GoogleFonts.prompt()),
-                    trailing: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.end,
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text('฿${order.totalAmount}', style: GoogleFonts.prompt(color: Colors.red, fontWeight: FontWeight.bold)),
-                        Text('ค้างชำระ', style: GoogleFonts.prompt(fontSize: 10, color: Colors.orange)),
+                        Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text('฿${order.totalAmount}', style: GoogleFonts.prompt(color: Colors.red, fontWeight: FontWeight.bold)),
+                            Text('ค้างชำระ', style: GoogleFonts.prompt(fontSize: 10, color: Colors.orange)),
+                          ],
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          icon: const Icon(Icons.payment, color: Colors.green),
+                          onPressed: () {
+                            _showPayConfirmDialog(context, order.id, order.totalAmount, order.customer?.name ?? 'ไม่ระบุชื่อ');
+                          },
+                        ),
                       ],
                     ),
                   ),
                 );
               },
             ),
+    );
+  }
+
+  void _showPayConfirmDialog(BuildContext context, String orderId, double amount, String customerName) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('ยืนยันการชำระหนี้', style: GoogleFonts.prompt(fontWeight: FontWeight.bold)),
+        content: Text(
+          'ลูกหนี้: $customerName\nยอดชำระ: ฿$amount\n\nยืนยันว่าได้รับชำระเงินเรียบร้อยแล้วใช่หรือไม่?',
+          style: GoogleFonts.prompt(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text('ยกเลิก', style: GoogleFonts.prompt(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            onPressed: () {
+              Provider.of<CartProvider>(context, listen: false).payDebt(orderId);
+              Navigator.of(ctx).pop();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('บันทึกการชำระหนี้สำเร็จ', style: GoogleFonts.prompt())),
+              );
+            },
+            child: Text('ยืนยันชำระเงิน', style: GoogleFonts.prompt(color: Colors.white)),
+          ),
+        ],
+      ),
     );
   }
 }

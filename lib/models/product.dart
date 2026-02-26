@@ -1,9 +1,11 @@
 import 'product_category.dart';
 import 'product_unit.dart';
+import 'warehouse.dart';
 
 // Export เพื่อให้ไฟล์อื่นที่ import product.dart สามารถเห็น ProductCategory และ ProductUnit ได้ทันที
 export 'product_category.dart';
 export 'product_unit.dart';
+export 'warehouse.dart';
 
 class Product {
   String id;
@@ -12,6 +14,7 @@ class Product {
   double price;
   ProductUnit unit;
   ProductCategory category;
+  Warehouse? warehouse;
 
   Product({
     required this.id,
@@ -20,6 +23,7 @@ class Product {
     required this.price,
     required this.unit,
     required this.category,
+    this.warehouse,
   });
 
   bool get isLowStock => stock <= 3;
@@ -34,6 +38,9 @@ class Product {
       'unitLabel': unit.label,
       'categoryId': category.id,
       'categoryLabel': category.label,
+      'warehouseId': warehouse?.id,
+      'warehouseName': warehouse?.name,
+      'warehouseLocation': warehouse?.location,
     };
   }
 
@@ -45,6 +52,9 @@ class Product {
       price: (map['price'] ?? 0).toDouble(),
       unit: ProductUnit(id: map['unitId'], label: map['unitLabel']),
       category: ProductCategory(id: map['categoryId'], label: map['categoryLabel']),
+      warehouse: map['warehouseId'] != null 
+        ? Warehouse(id: map['warehouseId'], name: map['warehouseName'], location: map['warehouseLocation'])
+        : null,
     );
   }
 }
