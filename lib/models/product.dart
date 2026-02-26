@@ -15,6 +15,8 @@ class Product {
   ProductUnit unit;
   ProductCategory category;
   Warehouse? warehouse;
+  final String? imagePath; //ใส่ ? เพื่อบอกว่าเป็นค่าว่างได้
+
 
   Product({
     required this.id,
@@ -24,6 +26,7 @@ class Product {
     required this.unit,
     required this.category,
     this.warehouse,
+    this.imagePath,
   });
 
   bool get isLowStock => stock <= 3;
@@ -41,6 +44,7 @@ class Product {
       'warehouseId': warehouse?.id,
       'warehouseName': warehouse?.name,
       'warehouseLocation': warehouse?.location,
+      'imagePath': imagePath,
     };
   }
 
@@ -55,6 +59,7 @@ class Product {
       warehouse: map['warehouseId'] != null 
         ? Warehouse(id: map['warehouseId'], name: map['warehouseName'], location: map['warehouseLocation'])
         : null,
+      imagePath: map['imagePath'],
     );
   }
 }
