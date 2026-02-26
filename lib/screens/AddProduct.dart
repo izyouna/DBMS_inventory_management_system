@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
@@ -20,18 +22,15 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
   ProductUnit? _selectedUnit;
   ProductCategory? _selectedCategory;
-  Warehouse? _selectedWarehouse;
 
   @override
   void initState() {
     super.initState();
     final provider = Provider.of<ProductProvider>(context, listen: false);
-    provider.clearImage(); // ล้างรูปภาพเก่าออกก่อนเริ่มใหม่
+    provider.clearImage(); 
     if (provider.units.isNotEmpty) _selectedUnit = provider.units[0];
     if (provider.categories.isNotEmpty)
       _selectedCategory = provider.categories[0];
-    if (provider.warehouses.isNotEmpty)
-      _selectedWarehouse = provider.warehouses[0];
   }
 
   @override
@@ -57,8 +56,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
       price: double.tryParse(_priceController.text.trim()) ?? 0.0,
       unit: _selectedUnit!,
       category: _selectedCategory!,
-      warehouse: _selectedWarehouse,
-      imagePath: provider.productImage?.path, // เก็บ path ของรูปภาพ
+      imagePath: provider.productImage?.path, 
     );
 
     Navigator.pop(context, product);
@@ -89,7 +87,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ส่วนเลือกรูปภาพโดยใช้ Provider
               Center(
                 child: GestureDetector(
                   onTap: () => provider.pickImage(ImageSource.gallery),
@@ -110,10 +107,15 @@ class _AddProductScreenState extends State<AddProductScreen> {
                     child: provider.productImage != null
                         ? ClipRRect(
                             borderRadius: BorderRadius.circular(20),
-                            child: Image.network(
-                              provider.productImage!.path,
-                              fit: BoxFit.cover,
-                            ),
+                            child: kIsWeb
+                                ? Image.network(
+                                    provider.productImage!.path,
+                                    fit: BoxFit.cover,
+                                  )
+                                : Image.file(
+                                    File(provider.productImage!.path),
+                                    fit: BoxFit.cover,
+                                  ),
                           )
                         : Column(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -209,20 +211,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
                           .toList(),
                       onChanged: (v) => setState(() => _selectedCategory = v),
                       decoration: _inputDecoration('หมวดหมู่'),
-                    ),
-                    const SizedBox(height: 20),
-                    DropdownButtonFormField<Warehouse>(
-                      value: _selectedWarehouse,
-                      items: provider.warehouses
-                          .map(
-                            (w) => DropdownMenuItem(
-                              value: w,
-                              child: Text(w.name, style: GoogleFonts.prompt()),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (v) => setState(() => _selectedWarehouse = v),
-                      decoration: _inputDecoration('คลังสินค้า'),
                     ),
                     const SizedBox(height: 20),
                     DropdownButtonFormField<ProductUnit>(

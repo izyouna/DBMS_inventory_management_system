@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../models/product.dart';
-import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 
 class ProductProvider with ChangeNotifier {
@@ -123,13 +122,13 @@ class ProductProvider with ChangeNotifier {
 
   int get lowStockCount => _products.where((p) => p.isLowStock).length;
 
-
-  File? _productImage;
+  // --- Image Management (Reusable) ---
+  XFile? _productImage;
   final ImagePicker _picker = ImagePicker();
 
-  File? get productImage => _productImage;
+  XFile? get productImage => _productImage;
 
-  //ฟังก์ชันเลือกรูปภาพ
+  // เลือกรูปภาพจาก Camera หรือ Gallery
   Future<void> pickImage(ImageSource source) async {
     try {
       final pickedFile = await _picker.pickImage(
@@ -140,7 +139,7 @@ class ProductProvider with ChangeNotifier {
       );
       
       if (pickedFile != null) {
-        _productImage = File(pickedFile.path);
+        _productImage = pickedFile;
         notifyListeners();
       }
     } catch (e) {
@@ -148,15 +147,19 @@ class ProductProvider with ChangeNotifier {
     }
   }
 
-  //ล้างรูปภาพ (Reset เป็น null)
+  // ล้างรูปภาพออก
   void clearImage() {
     _productImage = null;
     notifyListeners();
   }
 
-  //แก้ไขรูปภาพสินค้า
-  void setImage(File? image) {
-    _productImage = image;
+  // ตั้งค่ารูปภาพโดยตรง (ใช้ตอนกดแก้ไขสินค้า)
+  void setImageFromPath(String? path) {
+    if (path != null) {
+      _productImage = XFile(path);
+    } else {
+      _productImage = null;
+    }
     notifyListeners();
   }
 }
