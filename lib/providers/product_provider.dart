@@ -137,7 +137,7 @@ class ProductProvider with ChangeNotifier {
         maxHeight: 1000,
         imageQuality: 85,
       );
-      
+
       if (pickedFile != null) {
         _productImage = pickedFile;
         notifyListeners();
@@ -150,7 +150,9 @@ class ProductProvider with ChangeNotifier {
   // ล้างรูปภาพออก
   void clearImage() {
     _productImage = null;
-    notifyListeners();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      notifyListeners();
+    });
   }
 
   // ตั้งค่ารูปภาพโดยตรง (ใช้ตอนกดแก้ไขสินค้า)
