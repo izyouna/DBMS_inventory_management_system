@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/product.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
 
 class ProductProvider with ChangeNotifier {
   final List<ProductCategory> _categories = [
@@ -120,4 +122,41 @@ class ProductProvider with ChangeNotifier {
   }
 
   int get lowStockCount => _products.where((p) => p.isLowStock).length;
+
+
+  File? _productImage;
+  final ImagePicker _picker = ImagePicker();
+
+  File? get productImage => _productImage;
+
+  //ฟังก์ชันเลือกรูปภาพ
+  Future<void> pickImage(ImageSource source) async {
+    try {
+      final pickedFile = await _picker.pickImage(
+        source: source,
+        maxWidth: 1000,
+        maxHeight: 1000,
+        imageQuality: 85,
+      );
+      
+      if (pickedFile != null) {
+        _productImage = File(pickedFile.path);
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint("Error picking image: $e");
+    }
+  }
+
+  //ล้างรูปภาพ (Reset เป็น null)
+  void clearImage() {
+    _productImage = null;
+    notifyListeners();
+  }
+
+  //แก้ไขรูปภาพสินค้า
+  void setImage(File? image) {
+    _productImage = image;
+    notifyListeners();
+  }
 }
