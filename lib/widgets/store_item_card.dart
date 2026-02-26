@@ -41,13 +41,21 @@ class StoreItemCard extends StatelessWidget {
               color: const Color.fromARGB(255, 226, 232, 240),
               borderRadius: BorderRadius.circular(16),
             ),
-            child: const Center(
-              child: Icon(
-                Icons.shopping_basket_outlined,
-                size: 32,
-                color: Color(0xFF1E2736),
-              ),
-            ),
+            child: product.imagePath != null
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Image.network(
+                      product.imagePath!,
+                      fit: BoxFit.cover,
+                    ),
+                  )
+                : const Center(
+                    child: Icon(
+                      Icons.shopping_basket_outlined,
+                      size: 32,
+                      color: Color(0xFF1E2736),
+                    ),
+                  ),
           ),
           const SizedBox(height: 8),
           Text(

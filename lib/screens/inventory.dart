@@ -148,6 +148,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                   0.0,
                               unit: selectedUnit,
                               category: selectedCategory,
+                              imagePath: product.imagePath, // รักษา path รูปภาพเดิมไว้
                             ),
                           );
                           Navigator.pop(context);

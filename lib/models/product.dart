@@ -12,6 +12,8 @@ class Product {
   double price;
   ProductUnit unit;
   ProductCategory category;
+  final String? imagePath; //ใส่ ? เพื่อบอกว่าเป็นค่าว่างได้
+
 
   Product({
     required this.id,
@@ -20,6 +22,7 @@ class Product {
     required this.price,
     required this.unit,
     required this.category,
+    this.imagePath,
   });
 
   bool get isLowStock => stock <= 3;
@@ -34,6 +37,7 @@ class Product {
       'unitLabel': unit.label,
       'categoryId': category.id,
       'categoryLabel': category.label,
+      'imagePath': imagePath,
     };
   }
 
@@ -45,6 +49,7 @@ class Product {
       price: (map['price'] ?? 0).toDouble(),
       unit: ProductUnit(id: map['unitId'], label: map['unitLabel']),
       category: ProductCategory(id: map['categoryId'], label: map['categoryLabel']),
+      imagePath: map['imagePath'],
     );
   }
 }

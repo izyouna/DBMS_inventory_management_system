@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../models/product.dart';
 import '../providers/product_provider.dart';
@@ -24,6 +25,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
   void initState() {
     super.initState();
     final provider = Provider.of<ProductProvider>(context, listen: false);
+    provider.clearImage(); // ล้างรูปภาพเก่าออกก่อนเริ่มใหม่
     if (provider.units.isNotEmpty) _selectedUnit = provider.units[0];
     if (provider.categories.isNotEmpty)
       _selectedCategory = provider.categories[0];
@@ -43,6 +45,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
         _selectedCategory == null)
       return;
 
+    final provider = Provider.of<ProductProvider>(context, listen: false);
+
     final product = Product(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       name: _nameController.text.trim(),
@@ -50,6 +54,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
       price: double.tryParse(_priceController.text.trim()) ?? 0.0,
       unit: _selectedUnit!,
       category: _selectedCategory!,
+      imagePath: provider.productImage?.path, // เก็บ path ของรูปภาพ
     );
 
     Navigator.pop(context, product);
@@ -80,6 +85,54 @@ class _AddProductScreenState extends State<AddProductScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // ส่วนเลือกรูปภาพโดยใช้ Provider
+              Center(
+                child: GestureDetector(
+                  onTap: () => provider.pickImage(ImageSource.gallery),
+                  child: Container(
+                    width: 140,
+                    height: 140,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: provider.productImage != null
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(20),
+                            child: Image.network(
+                              provider.productImage!.path,
+                              fit: BoxFit.cover,
+                            ),
+                          )
+                        : Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(
+                                Icons.add_a_photo_outlined,
+                                size: 40,
+                                color: Colors.grey,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'เลือกรูปภาพ',
+                                style: GoogleFonts.prompt(
+                                  color: Colors.grey,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -121,7 +174,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                             decoration: _inputDecoration('จำนวน'),
                             validator: (v) =>
                                 (v == null || int.tryParse(v) == null)
-                                ? 'ระบุตัวเลข'
+                                ? 'กรุณาระบุุจำนวน'
                                 : null,
                           ),
                         ),
@@ -133,7 +186,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                             decoration: _inputDecoration('ราคาขาย'),
                             validator: (v) =>
                                 (v == null || double.tryParse(v) == null)
-                                ? 'ระบุตัวเลข'
+                                ? 'กรุณาระบุุตัวเลขราคา'
                                 : null,
                           ),
                         ),
