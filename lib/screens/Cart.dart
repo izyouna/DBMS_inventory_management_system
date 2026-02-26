@@ -6,6 +6,7 @@ import '../providers/product_provider.dart';
 import '../models/cart_item.dart';
 import '../models/order.dart';
 import '../models/customer.dart';
+import '../services/pdf_service.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -221,6 +222,17 @@ class _CartScreenState extends State<CartScreen> {
           ],
         ),
         actions: [
+          TextButton(
+            onPressed: () => PdfService.printOrder(order),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.print, size: 18),
+                const SizedBox(width: 8),
+                Text('พิมพ์${order.documentName}', style: GoogleFonts.prompt(fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: Text('ตกลง', style: GoogleFonts.prompt()),

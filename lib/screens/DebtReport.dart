@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
+import '../services/pdf_service.dart';
 
 class DebtReportScreen extends StatelessWidget {
   const DebtReportScreen({super.key});
@@ -40,6 +41,10 @@ class DebtReportScreen extends StatelessWidget {
                           ],
                         ),
                         const SizedBox(width: 8),
+                        IconButton(
+                          icon: const Icon(Icons.print, color: Colors.blueGrey),
+                          onPressed: () => PdfService.printOrder(order),
+                        ),
                         IconButton(
                           icon: const Icon(Icons.payment, color: Colors.green),
                           onPressed: () {

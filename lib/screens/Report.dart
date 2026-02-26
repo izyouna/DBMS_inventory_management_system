@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
+import '../services/pdf_service.dart';
 
 class ReportScreen extends StatefulWidget {
   const ReportScreen({super.key});
@@ -135,12 +136,32 @@ class _ReportScreenState extends State<ReportScreen> {
                             ),
                         ],
                       ),
-                      trailing: Text(
-                        '฿${order.totalAmount.toStringAsFixed(2)}',
-                        style: GoogleFonts.prompt(
-                          fontWeight: FontWeight.bold,
-                          color: order.isPaid ? Colors.green : Colors.red,
-                        ),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                '฿${order.totalAmount.toStringAsFixed(2)}',
+                                style: GoogleFonts.prompt(
+                                  fontWeight: FontWeight.bold,
+                                  color: order.isPaid ? Colors.green : Colors.red,
+                                ),
+                              ),
+                              Text(
+                                order.isPaid ? 'ชำระแล้ว' : 'ค้างชำระ',
+                                style: GoogleFonts.prompt(fontSize: 10, color: Colors.grey),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(width: 8),
+                          IconButton(
+                            icon: const Icon(Icons.print, size: 20, color: Colors.blueGrey),
+                            onPressed: () => PdfService.printOrder(order),
+                          ),
+                        ],
                       ),
                     ),
                   )).toList(),

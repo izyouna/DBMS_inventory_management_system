@@ -19,6 +19,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
   ProductUnit? _selectedUnit;
   ProductCategory? _selectedCategory;
+  Warehouse? _selectedWarehouse;
 
   @override
   void initState() {
@@ -27,6 +28,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
     if (provider.units.isNotEmpty) _selectedUnit = provider.units[0];
     if (provider.categories.isNotEmpty)
       _selectedCategory = provider.categories[0];
+    if (provider.warehouses.isNotEmpty)
+      _selectedWarehouse = provider.warehouses[0];
   }
 
   @override
@@ -50,6 +53,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
       price: double.tryParse(_priceController.text.trim()) ?? 0.0,
       unit: _selectedUnit!,
       category: _selectedCategory!,
+      warehouse: _selectedWarehouse,
     );
 
     Navigator.pop(context, product);
@@ -152,6 +156,20 @@ class _AddProductScreenState extends State<AddProductScreen> {
                           .toList(),
                       onChanged: (v) => setState(() => _selectedCategory = v),
                       decoration: _inputDecoration('หมวดหมู่'),
+                    ),
+                    const SizedBox(height: 20),
+                    DropdownButtonFormField<Warehouse>(
+                      value: _selectedWarehouse,
+                      items: provider.warehouses
+                          .map(
+                            (w) => DropdownMenuItem(
+                              value: w,
+                              child: Text(w.name, style: GoogleFonts.prompt()),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (v) => setState(() => _selectedWarehouse = v),
+                      decoration: _inputDecoration('คลังสินค้า'),
                     ),
                     const SizedBox(height: 20),
                     DropdownButtonFormField<ProductUnit>(

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:fl_chart/fl_chart.dart';
+import 'package:intl/intl.dart';
 import '../providers/product_provider.dart';
 import '../providers/cart_provider.dart';
 import '../widgets/summary_card.dart';
@@ -41,6 +43,39 @@ class _DashboardScreenState extends State<DashboardScreen> {
       0.0,
       (sum, o) => sum + o.totalAmount,
     );
+
+    // เตรียมข้อมูลกราฟ 7 วันล่าสุด
+    final List<BarChartGroupData> barGroups = [];
+    final List<String> days = [];
+
+    for (int i = 6; i >= 0; i--) {
+      final date = now.subtract(Duration(days: i));
+      final dayLabel = DateFormat('E').format(date); // Mon, Tue, ...
+      days.add(dayLabel);
+
+      final dailyTotal = cartProvider.orders
+          .where(
+            (o) =>
+                o.dateTime.day == date.day &&
+                o.dateTime.month == date.month &&
+                o.dateTime.year == date.year,
+          )
+          .fold(0.0, (sum, o) => sum + o.totalAmount);
+
+      barGroups.add(
+        BarChartGroupData(
+          x: 6 - i,
+          barRods: [
+            BarChartRodData(
+              toY: dailyTotal,
+              color: const Color(0xFF1E2736),
+              width: 18,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ],
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
@@ -102,7 +137,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(20),
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              height: 320,
+              height: 350,
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(20),
@@ -123,7 +158,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'ยอดขายรายวัน',
+                    'ยอดขาย 7 วันล่าสุด',
                     style: GoogleFonts.prompt(
                       color: Colors.black,
                       fontSize: 20,
@@ -132,18 +167,66 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'สรุปยอดขายของวันนี้',
+                    'สรุปภาพรวมรายวัน',
                     style: GoogleFonts.prompt(
                       color: Colors.grey[600],
                       fontSize: 13,
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 32),
                   Expanded(
-                    child: Center(
-                      child: Text(
-                        'กราฟแสดงยอดขาย (placeholder)',
-                        style: GoogleFonts.prompt(color: Colors.grey[500]),
+                    child: BarChart(
+                      BarChartData(
+                        alignment: BarChartAlignment.spaceAround,
+                        maxY: barGroups.isEmpty
+                            ? 100
+                            : (barGroups
+                                      .map((g) => g.barRods[0].toY)
+                                      .reduce((a, b) => a > b ? a : b) *
+                                  1.2),
+                        barTouchData: BarTouchData(
+                          touchTooltipData: BarTouchTooltipData(
+                            getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                              return BarTooltipItem(
+                                '฿${rod.toY.toStringAsFixed(0)}',
+                                GoogleFonts.prompt(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        titlesData: FlTitlesData(
+                          show: true,
+                          bottomTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              getTitlesWidget: (value, meta) {
+                                final index = value.toInt();
+                                if (index >= 0 && index < days.length) {
+                                  return Text(
+                                    days[index],
+                                    style: GoogleFonts.prompt(fontSize: 10),
+                                  );
+                                }
+                                return const Text('');
+                              },
+                            ),
+                          ),
+                          leftTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false),
+                          ),
+                          topTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false),
+                          ),
+                          rightTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false),
+                          ),
+                        ),
+                        gridData: const FlGridData(show: false),
+                        borderData: FlBorderData(show: false),
+                        barGroups: barGroups,
                       ),
                     ),
                   ),
