@@ -1,8 +1,10 @@
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/material.dart';
+import 'package:inventory_management_system/screens/DebtReport.dart';
 import 'package:provider/provider.dart';
 
 import 'providers/product_provider.dart';
+import 'providers/cart_provider.dart';
 import 'screens/AddProduct.dart';
 import 'screens/Dashboard.dart';
 import 'screens/Store.dart';
@@ -12,8 +14,11 @@ import 'screens/Setting.dart';
 
 void main() {
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => ProductProvider(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => ProductProvider()),
+        ChangeNotifierProvider(create: (_) => CartProvider()),
+      ],
       child: const InventoryApp(),
     ),
   );
@@ -50,6 +55,7 @@ class _MainNavScreenState extends State<MainNavScreen> {
     StoreScreen(),
     InventoryScreen(),
     AddProductScreen(),
+    DebtReportScreen(),
     ReportScreen(),
     SettingScreen(),
   ];
@@ -89,74 +95,86 @@ class _MainNavScreenState extends State<MainNavScreen> {
 
           items: [
             BottomNavigationBarItem(
-              icon: Icon(Icons.dashboard_outlined),
+              icon: const Icon(Icons.dashboard_outlined),
               activeIcon: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: const BoxDecoration(
                   color: Color.fromARGB(255, 30, 39, 54),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(Icons.dashboard_rounded),
+                child: const Icon(Icons.dashboard_rounded),
               ),
               label: 'แดชบอร์ด',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.shopping_cart_outlined),
+              icon: const Icon(Icons.shopping_cart_outlined),
               activeIcon: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: const BoxDecoration(
                   color: Color.fromARGB(255, 30, 39, 54),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(Icons.shopping_cart_rounded),
+                child: const Icon(Icons.shopping_cart_rounded),
               ),
               label: 'ขายสินค้า',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.indeterminate_check_box_outlined),
+              icon: const Icon(Icons.indeterminate_check_box_outlined),
               activeIcon: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: const BoxDecoration(
                   color: Color.fromARGB(255, 30, 39, 54),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(Icons.indeterminate_check_box_rounded),
+                child: const Icon(Icons.indeterminate_check_box_rounded),
               ),
               label: 'สินค้า',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.stacked_bar_chart_outlined),
+              icon: const Icon(Icons.stacked_bar_chart_outlined),
               activeIcon: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: const BoxDecoration(
                   color: Color.fromARGB(255, 30, 39, 54),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(Icons.stacked_bar_chart_rounded),
+                child: const Icon(Icons.stacked_bar_chart_rounded),
               ),
               label: 'เพิ่มสินค้า',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.auto_graph_outlined),
+              icon: const Icon(Icons.history_edu_outlined),
               activeIcon: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: const BoxDecoration(
                   color: Color.fromARGB(255, 30, 39, 54),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(Icons.auto_graph_rounded),
+                child: const Icon(Icons.history_edu_outlined),
+              ),
+              label: 'ลูกหนี้',
+            ),
+            BottomNavigationBarItem(
+              icon: const Icon(Icons.auto_graph_outlined),
+              activeIcon: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: const BoxDecoration(
+                  color: Color.fromARGB(255, 30, 39, 54),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.auto_graph_rounded),
               ),
               label: 'รายงาน',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.history_outlined),
+              icon: const Icon(Icons.history_outlined),
               activeIcon: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: const BoxDecoration(
                   color: Color.fromARGB(255, 30, 39, 54),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(Icons.history),
+                child: const Icon(Icons.history),
               ),
               label: 'ตั้งค่า',
             ),

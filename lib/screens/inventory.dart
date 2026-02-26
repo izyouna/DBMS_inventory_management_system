@@ -15,6 +15,8 @@ class InventoryScreen extends StatefulWidget {
 
 class _InventoryScreenState extends State<InventoryScreen> {
   String _search = '';
+  String? _selectedCategoryId;
+  String? _selectedWarehouseId;
 
   void _openAddProduct(ProductProvider provider) async {
     final newProduct = await Navigator.push<Product>(
@@ -41,6 +43,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
     ProductCategory selectedCategory = provider.categories.firstWhere(
       (c) => c.id == product.category.id,
     );
+    Warehouse? selectedWarehouse = product.warehouse != null 
+      ? provider.warehouses.firstWhere((w) => w.id == product.warehouse!.id)
+      : null;
 
     showModalBottomSheet(
       context: context,
@@ -113,6 +118,22 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       decoration: _inputDecoration('หมวดหมู่'),
                     ),
                     const SizedBox(height: 16),
+                    DropdownButtonFormField<Warehouse>(
+                      value: selectedWarehouse,
+                      items: provider.warehouses
+                          .map(
+                            (w) => DropdownMenuItem(
+                              value: w,
+                              child: Text('${w.name} (${w.location})', style: GoogleFonts.prompt()),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (v) {
+                        if (v != null) setModalState(() => selectedWarehouse = v);
+                      },
+                      decoration: _inputDecoration('คลังสินค้า'),
+                    ),
+                    const SizedBox(height: 16),
                     DropdownButtonFormField<ProductUnit>(
                       value: selectedUnit,
                       items: provider.units
@@ -148,6 +169,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                   0.0,
                               unit: selectedUnit,
                               category: selectedCategory,
+                              warehouse: selectedWarehouse,
                             ),
                           );
                           Navigator.pop(context);
@@ -214,13 +236,33 @@ class _InventoryScreenState extends State<InventoryScreen> {
     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
   );
 
+  InputDecoration _filterDecoration(String label) => InputDecoration(
+    labelText: label,
+    labelStyle: GoogleFonts.prompt(fontSize: 14, color: Colors.blueGrey),
+    filled: true,
+    fillColor: Colors.white,
+    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: BorderSide(color: Colors.grey[300]!),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: BorderSide(color: Colors.grey[200]!),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
     return Consumer<ProductProvider>(
       builder: (context, provider, child) {
-        final filtered = provider.products
-            .where((p) => p.name.toLowerCase().contains(_search.toLowerCase()))
-            .toList();
+        final filtered = provider.products.where((p) {
+          final matchesSearch = p.name.toLowerCase().contains(_search.toLowerCase());
+          final matchesCategory = _selectedCategoryId == null || p.category.id == _selectedCategoryId;
+          final matchesWarehouse = _selectedWarehouseId == null || p.warehouse?.id == _selectedWarehouseId;
+          return matchesSearch && matchesCategory && matchesWarehouse;
+        }).toList();
+
         return Scaffold(
           backgroundColor: const Color(0xFFF5F6FA),
           appBar: AppBar(
@@ -243,11 +285,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
           body: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                 child: TextField(
                   onChanged: (v) => setState(() => _search = v),
                   decoration: InputDecoration(
-                    hintText: 'ค้นหา...',
+                    hintText: 'ค้นหาชื่อสินค้า...',
                     prefixIcon: const Icon(Icons.search),
                     filled: true,
                     fillColor: Colors.white,
@@ -258,9 +300,54 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   ),
                 ),
               ),
+              // Filter Dropdowns
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
+                  children: [
+                    // Dropdown หมวดหมู่
+                    Expanded(
+                      child: DropdownButtonFormField<String?>(
+                        value: _selectedCategoryId,
+                        items: [
+                          DropdownMenuItem(
+                            value: null,
+                            child: Text('ทุกหมวดหมู่', style: GoogleFonts.prompt(fontSize: 13)),
+                          ),
+                          ...provider.categories.map((cat) => DropdownMenuItem(
+                            value: cat.id,
+                            child: Text(cat.label, style: GoogleFonts.prompt(fontSize: 13)),
+                          )),
+                        ],
+                        onChanged: (v) => setState(() => _selectedCategoryId = v),
+                        decoration: _filterDecoration('หมวดหมู่'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Dropdown คลังสินค้า
+                    Expanded(
+                      child: DropdownButtonFormField<String?>(
+                        value: _selectedWarehouseId,
+                        items: [
+                          DropdownMenuItem(
+                            value: null,
+                            child: Text('ทุกคลัง', style: GoogleFonts.prompt(fontSize: 13)),
+                          ),
+                          ...provider.warehouses.map((wh) => DropdownMenuItem(
+                            value: wh.id,
+                            child: Text(wh.name, style: GoogleFonts.prompt(fontSize: 13)),
+                          )),
+                        ],
+                        onChanged: (v) => setState(() => _selectedWarehouseId = v),
+                        decoration: _filterDecoration('คลังสินค้า'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               Expanded(
                 child: ListView.separated(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.all(16),
                   itemBuilder: (context, index) => InventoryItemCard(
                     product: filtered[index],
                     onEdit: () => _showEditDialog(provider, filtered[index]),

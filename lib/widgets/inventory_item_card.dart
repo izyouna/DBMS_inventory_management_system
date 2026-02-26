@@ -69,7 +69,26 @@ class InventoryItemCard extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              if (product.isLowStock)
+              if (product.stock == 0)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.red[50],
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    'ของหมด',
+                    style: GoogleFonts.prompt(
+                      color: Colors.red[700],
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                )
+              else if (product.isLowStock)
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 8,
