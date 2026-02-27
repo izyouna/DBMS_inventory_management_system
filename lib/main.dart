@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 
 import 'providers/product_provider.dart';
 import 'providers/cart_provider.dart';
-import 'screens/AddProduct.dart';
+// import 'screens/AddProduct.dart';
 import 'screens/Dashboard.dart';
 import 'screens/Store.dart';
 import 'screens/inventory.dart';
@@ -54,7 +54,7 @@ class _MainNavScreenState extends State<MainNavScreen> {
     DashboardScreen(),
     StoreScreen(),
     InventoryScreen(),
-    AddProductScreen(),
+    // AddProductScreen(),
     DebtReportScreen(),
     ReportScreen(),
     SettingScreen(),
@@ -130,18 +130,18 @@ class _MainNavScreenState extends State<MainNavScreen> {
               ),
               label: 'สินค้า',
             ),
-            BottomNavigationBarItem(
-              icon: const Icon(Icons.stacked_bar_chart_outlined),
-              activeIcon: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: const BoxDecoration(
-                  color: Color.fromARGB(255, 30, 39, 54),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.stacked_bar_chart_rounded),
-              ),
-              label: 'เพิ่มสินค้า',
-            ),
+            // BottomNavigationBarItem(
+            //   icon: const Icon(Icons.stacked_bar_chart_outlined),
+            //   activeIcon: Container(
+            //     padding: const EdgeInsets.all(8),
+            //     decoration: const BoxDecoration(
+            //       color: Color.fromARGB(255, 30, 39, 54),
+            //       shape: BoxShape.circle,
+            //     ),
+            //     child: const Icon(Icons.stacked_bar_chart_rounded),
+            //   ),
+            //   label: 'เพิ่มสินค้า',
+            // ),
             BottomNavigationBarItem(
               icon: const Icon(Icons.history_edu_outlined),
               activeIcon: Container(
