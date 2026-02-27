@@ -37,7 +37,7 @@ class StoreItemCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            height: 80,
+            height: 60,
             width: double.infinity,
             decoration: BoxDecoration(
               color: const Color.fromARGB(255, 226, 232, 240),
@@ -50,28 +50,87 @@ class StoreItemCard extends StatelessWidget {
                         ? Image.network(product.imagePath!, fit: BoxFit.cover)
                         : Image.file(File(product.imagePath!), fit: BoxFit.cover),
                   )
-                : const Center(child: Icon(Icons.shopping_basket_outlined, size: 32, color: Color(0xFF1E2736))),
+                : const Center(
+                    child: Icon(
+                      Icons.shopping_basket_outlined,
+                      size: 32,
+                      color: Color(0xFF1E2736),
+                    ),
+                  ),
           ),
           const SizedBox(height: 8),
-          Text(product.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: GoogleFonts.prompt(fontSize: 14, fontWeight: FontWeight.w600)),
-          Text('฿${product.price.toStringAsFixed(0)}', style: GoogleFonts.prompt(fontSize: 16, fontWeight: FontWeight.bold)),
+          Text(
+            product.name,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.prompt(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           const Spacer(),
+          Text(
+            '฿${product.price.toStringAsFixed(0)}',
+            style: GoogleFonts.prompt(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: const Color(0xFF1E2736),
+            ),
+          ),
+          const SizedBox(height: 2),
+          product.stock == 0
+              ? Text(
+                  'ของหมด',
+                  style: GoogleFonts.prompt(
+                    fontSize: 12,
+                    color: Colors.red,
+                    fontWeight: FontWeight.bold,
+                  ),
+                )
+              : Text(
+                  'คงเหลือ: ${product.stock}',
+                  style: GoogleFonts.prompt(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                  ),
+                ),
+          const SizedBox(height: 4),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               if (inCart > 0)
                 Row(
                   children: [
-                    IconButton(icon: const Icon(Icons.remove_circle_outline, size: 20), onPressed: onRemove),
-                    Text(inCart.toString(), style: GoogleFonts.prompt(fontWeight: FontWeight.w600)),
-                    IconButton(icon: const Icon(Icons.add_circle_outline, size: 20), onPressed: onAdd),
+                    IconButton(
+                      padding: EdgeInsets.zero,
+                      icon: const Icon(Icons.remove_circle_outline, size: 20),
+                      onPressed: onRemove,
+                    ),
+                    Text(
+                      inCart.toString(),
+                      style: GoogleFonts.prompt(fontWeight: FontWeight.w600),
+                    ),
+                    IconButton(
+                      padding: EdgeInsets.zero,
+                      icon: const Icon(Icons.add_circle_outline, size: 20),
+                      onPressed: product.stock <= inCart ? null : onAdd,
+                    ),
                   ],
                 )
               else
-                ElevatedButton(
-                  onPressed: onAdd,
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1E2736), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-                  child: const Text('เพิ่ม'),
+                TextButton(
+                  onPressed: product.stock == 0 ? null : onAdd,
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    backgroundColor: product.stock == 0
+                        ? Colors.grey
+                        : const Color.fromARGB(255, 30, 39, 54),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text('เพิ่ม', style: GoogleFonts.prompt(fontSize: 13)),
                 ),
             ],
           ),

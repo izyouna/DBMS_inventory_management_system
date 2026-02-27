@@ -178,7 +178,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     child: BarChart(
                       BarChartData(
                         alignment: BarChartAlignment.spaceAround,
-                        maxY: barGroups.isEmpty
+                        maxY: barGroups.isEmpty || barGroups.every((g) => g.barRods[0].toY == 0)
                             ? 100
                             : (barGroups
                                       .map((g) => g.barRods[0].toY)
