@@ -35,25 +35,34 @@ class ProductProvider with ChangeNotifier {
 
   // ฟังก์ชันโหลดข้อมูลจาก SQLite
   Future<void> loadProductsFromDatabase() async {
-    final dbProducts = await DatabaseService.instance.getProducts();
-    _products = dbProducts.map((map) => Product.fromMap(map)).toList();
-    
-    // ถ้าใน DB ไม่มีข้อมูลเลย ให้ใส่ข้อมูลเริ่มต้น (Optional)
-    if (_products.isEmpty) {
-      _products = [
-        Product(
-          id: '1',
-          name: 'ปุ๋ยอินทรีย์ 50kg',
-          price: 450.0,
-          stock: 10,
-          unit: _units[1],
-          category: _categories[0],
-          warehouse: _warehouses[1],
-        ),
-        // ... ข้อมูลเริ่มต้นอื่นๆ ...
-      ];
+    try {
+      final dbProducts = await DatabaseService.instance.getProducts();
+      _products = dbProducts.map((map) => Product.fromMap(map)).toList();
+      
+      // ถ้าใน DB ไม่มีข้อมูลเลย ให้ใส่ข้อมูลเริ่มต้น (Optional)
+      if (_products.isEmpty) {
+        _setInitialProducts();
+      }
+    } catch (e) {
+      debugPrint("Error loading products: $e");
+      // กรณีโหลดไม่ได้ (เช่น บน Windows ที่ไม่ได้ตั้งค่า) ให้ใช้ข้อมูลเริ่มต้นไปก่อน
+      _setInitialProducts();
     }
     notifyListeners();
+  }
+
+  void _setInitialProducts() {
+    _products = [
+      Product(
+        id: '1',
+        name: 'ปุ๋ยอินทรีย์ 50kg',
+        price: 450.0,
+        stock: 10,
+        unit: _units[1],
+        category: _categories[0],
+        warehouse: _warehouses[1],
+      ),
+    ];
   }
 
   List<Product> get products => [..._products];

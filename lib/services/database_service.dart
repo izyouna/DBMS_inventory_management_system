@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:sqflite/sqlite_api.dart';
@@ -24,27 +25,32 @@ class DatabaseService {
   }
 
   Future<Database> getDatabase() async {
-    final databaseDirPath = await getDatabasesPath();
-    final databasePath = join(databaseDirPath, "master_db.db");
-    final database = await openDatabase(
-      databasePath,
-      version: 1,
-      onCreate: (db, version) {
-        db.execute('''
-        CREATE TABLE $_productTableName(
-          $_productIdColumnName INTEGER PRIMARY KEY AUTOINCREMENT,
-          $_productNameColumnName TEXT NOT NULL,
-          $_productCategoryColumnName TEXT,
-          $_productTotalUnitColumnName INTEGER,
-          $_productPriceColumnName REAL,
-          $_productUnitColumnName TEXT,
-          $_productImagePathColumnName TEXT
-
-        )
-        ''');
-      },
-    );
-    return database;
+    try {
+      final databaseDirPath = await getDatabasesPath();
+      final databasePath = join(databaseDirPath, "master_db.db");
+      final database = await openDatabase(
+        databasePath,
+        version: 1,
+        onCreate: (db, version) {
+          db.execute('''
+          CREATE TABLE $_productTableName(
+            $_productIdColumnName INTEGER PRIMARY KEY AUTOINCREMENT,
+            $_productNameColumnName TEXT NOT NULL,
+            $_productCategoryColumnName TEXT,
+            $_productTotalUnitColumnName INTEGER,
+            $_productPriceColumnName REAL,
+            $_productUnitColumnName TEXT,
+            $_productImagePathColumnName TEXT
+          )
+          ''');
+        },
+      );
+      return database;
+    } catch (e) {
+      debugPrint("Error opening database: $e");
+      // ถ้าเปิดไม่ได้จริงๆ บน Windows ให้พยายามใช้ FFI หรืออย่างน้อยก็ไม่ให้แอปค้าง
+      rethrow;
+    }
   }
 
   Future<int> addProduct({

@@ -15,7 +15,18 @@ import 'screens/Setting.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await DatabaseService.instance.printAllProducts();
+  
+  // ใส่ try-catch แก้ป้องกันแอปค้างที่หน้าจอขาวหากฐานข้อมูลมีปัญหา
+  try {
+    // พิมพ์ข้อมูลเพื่อ Debug โดยไม่รอให้เสร็จก่อนเริ่มแอป (หรือใส่ await ถ้าต้องการให้เสร็จก่อน)
+    // แต่บน Windows sqflite อาจจะ crash ถ้าไม่มีการตั้งค่า FFI
+    await DatabaseService.instance.printAllProducts().catchError((e) {
+      debugPrint("Database Error: $e");
+    });
+  } catch (e) {
+    debugPrint("Initialization Error: $e");
+  }
+
   runApp(
     MultiProvider(
       providers: [
