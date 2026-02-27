@@ -54,17 +54,85 @@ class InventoryItemCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(product.name, style: GoogleFonts.prompt(fontSize: 15, fontWeight: FontWeight.w600)),
+                Text(
+                  product.name,
+                  style: GoogleFonts.prompt(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
                 const SizedBox(height: 4),
                 Text(
                   'คงเหลือ ${product.stock} ${product.unit.label} (฿${product.price})',
-                  style: GoogleFonts.prompt(color: Colors.grey[600], fontSize: 13),
+                  style: GoogleFonts.prompt(
+                    color: Colors.grey[600],
+                    fontSize: 13,
+                  ),
                 ),
               ],
             ),
           ),
-          IconButton(icon: const Icon(Icons.edit_outlined, size: 20), onPressed: onEdit),
-          IconButton(icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red), onPressed: onDelete),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              if (product.stock == 0)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.red[50],
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    'ของหมด',
+                    style: GoogleFonts.prompt(
+                      color: Colors.red[700],
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                )
+              else if (product.isLowStock)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color.fromARGB(255, 254, 242, 199),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    'ใกล้หมด',
+                    style: GoogleFonts.prompt(
+                      color: const Color.fromARGB(255, 180, 83, 9),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.edit_outlined, size: 20),
+                    onPressed: onEdit,
+                  ),
+                  IconButton(
+                    icon: const Icon(
+                      Icons.delete_outline,
+                      size: 20,
+                      color: Colors.red,
+                    ),
+                    onPressed: onDelete,
+                  ),
+                ],
+              ),
+            ],
+          ),
         ],
       ),
     );
