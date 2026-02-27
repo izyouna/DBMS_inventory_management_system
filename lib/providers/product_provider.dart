@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/product.dart';
 import 'package:image_picker/image_picker.dart';
+import '../services/database_service.dart';
 
 class ProductProvider with ChangeNotifier {
   final List<ProductCategory> _categories = [
@@ -25,56 +26,34 @@ class ProductProvider with ChangeNotifier {
     Warehouse(id: 'w3', name: 'โรงรถ', location: 'โซน C'),
   ];
 
-  late final List<Product> _products;
+  List<Product> _products = []; // เปลี่ยนจาก late final เป็น List ปกติ
 
   ProductProvider() {
-    _products = [
-      Product(
-        id: '1',
-        name: 'ปุ๋ยอินทรีย์ 50kg',
-        price: 450.0,
-        stock: 10,
-        unit: _units[1],
-        category: _categories[0],
-        warehouse: _warehouses[1],
-      ),
-      Product(
-        id: '2',
-        name: 'ยาฆ่าแมลง 1L',
-        price: 250.0,
-        stock: 3,
-        unit: _units[2],
-        category: _categories[1],
-        warehouse: _warehouses[0],
-      ),
-      Product(
-        id: '3',
-        name: 'เมล็ดข้าวโพด 5kg',
-        price: 320.0,
-        stock: 20,
-        unit: _units[4],
-        category: _categories[2],
-        warehouse: _warehouses[1],
-      ),
-      Product(
-        id: '4',
-        name: 'เมล็ดข้าวหอมมะลิ 5kg',
-        price: 350.0,
-        stock: 15,
-        unit: _units[4],
-        category: _categories[2],
-        warehouse: _warehouses[1],
-      ),
-      Product(
-        id: '5',
-        name: 'อุปกรณ์ฉีดพ่น',
-        price: 890.0,
-        stock: 5,
-        unit: _units[0],
-        category: _categories[3],
-        warehouse: _warehouses[2],
-      ),
-    ];
+    _products = []; // เริ่มต้นเป็นรายการว่าง
+    loadProductsFromDatabase(); // โหลดจาก DB ทันทีที่สร้าง Provider
+  }
+
+  // ฟังก์ชันโหลดข้อมูลจาก SQLite
+  Future<void> loadProductsFromDatabase() async {
+    final dbProducts = await DatabaseService.instance.getProducts();
+    _products = dbProducts.map((map) => Product.fromMap(map)).toList();
+    
+    // ถ้าใน DB ไม่มีข้อมูลเลย ให้ใส่ข้อมูลเริ่มต้น (Optional)
+    if (_products.isEmpty) {
+      _products = [
+        Product(
+          id: '1',
+          name: 'ปุ๋ยอินทรีย์ 50kg',
+          price: 450.0,
+          stock: 10,
+          unit: _units[1],
+          category: _categories[0],
+          warehouse: _warehouses[1],
+        ),
+        // ... ข้อมูลเริ่มต้นอื่นๆ ...
+      ];
+    }
+    notifyListeners();
   }
 
   List<Product> get products => [..._products];
@@ -98,7 +77,21 @@ class ProductProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  void updateProduct(Product updatedProduct) {
+  void updateProduct(Product updatedProduct) async {
+    // อัปเดตใน SQLite
+    final dbId = int.tryParse(updatedProduct.id);
+    if (dbId != null) {
+      await DatabaseService.instance.updateProduct(
+        id: dbId,
+        name: updatedProduct.name,
+        category: updatedProduct.category.label,
+        stock: updatedProduct.stock,
+        price: updatedProduct.price,
+        unit: updatedProduct.unit.label,
+        imagePath: updatedProduct.imagePath,
+      );
+    }
+
     final index = _products.indexWhere((p) => p.id == updatedProduct.id);
     if (index != -1) {
       _products[index] = updatedProduct;
@@ -106,7 +99,14 @@ class ProductProvider with ChangeNotifier {
     }
   }
 
-  void deleteProduct(String id) {
+  void deleteProduct(String id) async {
+    // ลบใน SQLite (ต้องแปลง id เป็น int ก่อนส่ง)
+    final dbId = int.tryParse(id);
+    if (dbId != null) {
+      await DatabaseService.instance.deleteProduct(dbId);
+    }
+    
+    // ลบในรายการของ Provider เพื่ออัปเดต UI ทันที
     _products.removeWhere((p) => p.id == id);
     notifyListeners();
   }
@@ -162,6 +162,8 @@ class ProductProvider with ChangeNotifier {
     } else {
       _productImage = null;
     }
-    notifyListeners();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      notifyListeners();
+    });
   }
 }
