@@ -37,8 +37,15 @@ class _InventoryScreenState extends State<InventoryScreen> {
     // ดึงรูปเดิมมาแสดงใน Provider
     provider.setImageFromPath(product.imagePath);
 
-    ProductUnit selectedUnit = provider.units.firstWhere((u) => u.id == product.unit.id);
-    ProductCategory selectedCategory = provider.categories.firstWhere((c) => c.id == product.category.id);
+    // แก้ไข: ค้นหาด้วย label แทน id เพราะข้อมูลจาก DB มีแต่ label
+    ProductUnit selectedUnit = provider.units.firstWhere(
+      (u) => u.label == product.unit.label,
+      orElse: () => provider.units.first,
+    );
+    ProductCategory selectedCategory = provider.categories.firstWhere(
+      (c) => c.label == product.category.label,
+      orElse: () => provider.categories.first,
+    );
 
     showModalBottomSheet(
       context: context,

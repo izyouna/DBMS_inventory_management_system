@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../models/product.dart';
 import '../providers/product_provider.dart';
+import '../services/database_service.dart';
 
 class AddProductScreen extends StatefulWidget {
   const AddProductScreen({super.key});
@@ -27,7 +28,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
   void initState() {
     super.initState();
     final provider = Provider.of<ProductProvider>(context, listen: false);
-    provider.clearImage(); 
+    provider.clearImage();
     if (provider.units.isNotEmpty) _selectedUnit = provider.units[0];
     if (provider.categories.isNotEmpty)
       _selectedCategory = provider.categories[0];
@@ -41,25 +42,49 @@ class _AddProductScreenState extends State<AddProductScreen> {
     super.dispose();
   }
 
-  void _submit() {
+  void _submit() async {
     if (!_formKey.currentState!.validate() ||
         _selectedUnit == null ||
-        _selectedCategory == null)
+        _selectedCategory == null) {
       return;
+    }
 
     final provider = Provider.of<ProductProvider>(context, listen: false);
 
-    final product = Product(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      name: _nameController.text.trim(),
-      stock: int.tryParse(_stockController.text.trim()) ?? 0,
-      price: double.tryParse(_priceController.text.trim()) ?? 0.0,
-      unit: _selectedUnit!,
-      category: _selectedCategory!,
-      imagePath: provider.productImage?.path, 
-    );
+    try {
+      final name = _nameController.text.trim();
+      final stock = int.tryParse(_stockController.text.trim()) ?? 0;
+      final price = double.tryParse(_priceController.text.trim()) ?? 0.0;
+      final imagePath = provider.productImage?.path;
 
-    Navigator.pop(context, product);
+      final id = await DatabaseService.instance.addProduct(
+        name: name,
+        stock: stock,
+        price: price,
+        unit: _selectedUnit!.label,
+        category: _selectedCategory!.label,
+        imagePath: imagePath,
+      );
+
+      // สร้างอ็อบเจกต์ Product เพื่อส่งกลับไปแสดงผลทันที
+      final newProduct = Product(
+        id: id.toString(),
+        name: name,
+        stock: stock,
+        price: price,
+        unit: _selectedUnit!,
+        category: _selectedCategory!,
+        imagePath: imagePath,
+      );
+
+      if (mounted) {
+        Navigator.pop(context, newProduct);
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('เกิดข้อผิดพลาด: $e')));
+    }
   }
 
   @override

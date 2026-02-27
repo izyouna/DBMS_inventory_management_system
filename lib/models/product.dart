@@ -17,7 +17,6 @@ class Product {
   Warehouse? warehouse;
   final String? imagePath; //ใส่ ? เพื่อบอกว่าเป็นค่าว่างได้
 
-
   Product({
     required this.id,
     required this.name,
@@ -50,16 +49,20 @@ class Product {
 
   factory Product.fromMap(Map<String, dynamic> map) {
     return Product(
-      id: map['id'] ?? '',
-      name: map['name'] ?? '',
-      stock: map['stock'] ?? 0,
-      price: (map['price'] ?? 0).toDouble(),
-      unit: ProductUnit(id: map['unitId'], label: map['unitLabel']),
-      category: ProductCategory(id: map['categoryId'], label: map['categoryLabel']),
-      warehouse: map['warehouseId'] != null 
-        ? Warehouse(id: map['warehouseId'], name: map['warehouseName'], location: map['warehouseLocation'])
-        : null,
-      imagePath: map['imagePath'],
+      id: map['ProductID']?.toString() ?? '',
+      name: map['ProductName'] ?? '',
+      stock: map['TotalUnit'] ?? 0,
+      price: (map['Price'] ?? 0).toDouble(),
+      unit: ProductUnit(id: '', label: map['Unit'] ?? ''),
+      category: ProductCategory(id: '', label: map['Category'] ?? ''),
+      warehouse: map['warehouseId'] != null
+          ? Warehouse(
+              id: map['warehouseId'],
+              name: map['warehouseName'],
+              location: map['warehouseLocation'],
+            )
+          : null,
+      imagePath: map['ImagePath'],
     );
   }
 }
