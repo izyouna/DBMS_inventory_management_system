@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import 'providers/product_provider.dart';
 import 'providers/cart_provider.dart';
+import 'services/database_service.dart';
 // import 'screens/AddProduct.dart';
 import 'screens/Dashboard.dart';
 import 'screens/Store.dart';
@@ -12,7 +13,20 @@ import 'screens/inventory.dart';
 import 'screens/Report.dart';
 import 'screens/Setting.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // ใส่ try-catch แก้ป้องกันแอปค้างที่หน้าจอขาวหากฐานข้อมูลมีปัญหา
+  try {
+    // พิมพ์ข้อมูลเพื่อ Debug โดยไม่รอให้เสร็จก่อนเริ่มแอป (หรือใส่ await ถ้าต้องการให้เสร็จก่อน)
+    // แต่บน Windows sqflite อาจจะ crash ถ้าไม่มีการตั้งค่า FFI
+    await DatabaseService.instance.printAllProducts().catchError((e) {
+      debugPrint("Database Error: $e");
+    });
+  } catch (e) {
+    debugPrint("Initialization Error: $e");
+  }
+
   runApp(
     MultiProvider(
       providers: [
