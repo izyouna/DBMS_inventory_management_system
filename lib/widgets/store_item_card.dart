@@ -47,7 +47,7 @@ class StoreItemCard extends StatelessWidget {
                 ? ClipRRect(
                     borderRadius: BorderRadius.circular(16),
                     child: kIsWeb
-                        ? Image.network(product.imagePath!, fit: BoxFit.cover)
+                        ? Image.network(product.imagePath!,key: ValueKey(product.imagePath!), fit: BoxFit.cover)
                         : Image.file(File(product.imagePath!),key: ValueKey(product.imagePath!), fit: BoxFit.cover),
                   )
                 : const Center(
