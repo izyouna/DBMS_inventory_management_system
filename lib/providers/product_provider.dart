@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../models/product.dart';
 import 'package:image_picker/image_picker.dart';
@@ -33,40 +34,57 @@ class ProductProvider with ChangeNotifier {
     loadProductsFromDatabase(); // โหลดจาก DB ทันทีที่สร้าง Provider
   }
 
-  // ฟังก์ชันโหลดข้อมูลจาก SQLite
+  // ฟังก์ชันโหลดข้อมูลจากฐานข้อมูล
   Future<void> loadProductsFromDatabase() async {
     try {
       final dbProducts = await DatabaseService.instance.getProducts();
       
       if (dbProducts.isEmpty) {
-        // ถ้าใน DB ไม่มีข้อมูลเลย ให้ใส่ข้อมูลเริ่มต้นและบันทึกลง DB
-        await _setInitialProducts();
-        // โหลดใหม่อีกครั้งหลังจากบันทึกแล้วเพื่อให้ได้ ID ที่ถูกต้องจาก DB
-        final updatedDbProducts = await DatabaseService.instance.getProducts();
-        _products = updatedDbProducts.map((map) => Product.fromMap(map, _categories, _units)).toList();
+        // ถ้าฐานข้อมูลว่าง ให้แสดงข้อมูลเริ่มต้นใน Memory
+        _setInitialFallback();
+        notifyListeners();
+        
+        // สำหรับ Mobile/Windows พยายามบันทึกลง DB จริง
+        if (!kIsWeb) {
+          try {
+            await _setInitialProducts();
+            final updatedDbProducts = await DatabaseService.instance.getProducts();
+            if (updatedDbProducts.isNotEmpty) {
+              _products = updatedDbProducts.map((map) => Product.fromMap(map, _categories, _units)).toList();
+              notifyListeners();
+            }
+          } catch (e) {
+            debugPrint("Failed to save initial products to DB: $e");
+          }
+        }
       } else {
         _products = dbProducts.map((map) => Product.fromMap(map, _categories, _units)).toList();
+        notifyListeners();
       }
     } catch (e) {
       debugPrint("Error loading products: $e");
-      // กรณีโหลดไม่ได้ (เช่น บน Windows ที่ไม่ได้ตั้งค่า) ให้ใช้ข้อมูลใน Memory ไปก่อน
-      _products = [
-        Product(
-          id: '1',
-          name: 'ปุ๋ยอินทรีย์ 50kg',
-          price: 450.0,
-          stock: 10,
-          unit: _units[1],
-          category: _categories[0],
-          warehouse: _warehouses[1],
-        ),
-      ];
+      _setInitialFallback();
+      notifyListeners();
     }
-    notifyListeners();
+  }
+
+  void _setInitialFallback() {
+    // สินค้าเริ่มต้นสำหรับแสดงผลทันที
+    _products = [
+      Product(
+        id: '1',
+        name: 'ปุ๋ยอินทรีย์ 50kg',
+        price: 450.0,
+        stock: 10,
+        unit: _units[1],
+        category: _categories[0],
+        warehouse: _warehouses[1],
+      ),
+    ];
   }
 
   Future<void> _setInitialProducts() async {
-    // บันทึกสินค้าเริ่มต้นลงฐานข้อมูลจริงๆ
+    // บันทึกสินค้าเริ่มต้นลงฐานข้อมูลจริงๆ (ถ้ามี)
     await DatabaseService.instance.addProduct(
       name: 'ปุ๋ยอินทรีย์ 50kg',
       price: 450.0,
@@ -79,12 +97,12 @@ class ProductProvider with ChangeNotifier {
     );
   }
 
-  List<Product> get products => [..._products];
-  List<ProductCategory> get categories => [..._categories];
-  List<ProductUnit> get units => [..._units];
-  List<Warehouse> get warehouses => [..._warehouses];
+  List<Product> get products => _products;
+  List<ProductCategory> get categories => _categories;
+  List<ProductUnit> get units => _units;
+  List<Warehouse> get warehouses => _warehouses;
   Map<String, int> _cart = {};
-  Map<String, int> get cart => {..._cart};
+  Map<String, int> get cart => _cart;
 
   void addWarehouse(Warehouse warehouse) {
     _warehouses.add(warehouse);
@@ -96,8 +114,12 @@ class ProductProvider with ChangeNotifier {
   }
 
   void addProduct(Product product) {
-    _products.add(product);
-    notifyListeners();
+    // ตรวจสอบว่ามีสินค้า ID นี้อยู่แล้วหรือไม่ เพื่อป้องกันข้อมูลซ้ำซ้อน
+    final existingIndex = _products.indexWhere((p) => p.id == product.id);
+    if (existingIndex == -1) {
+      _products.add(product);
+      notifyListeners();
+    }
   }
 
   void updateProduct(Product updatedProduct) async {
@@ -131,13 +153,18 @@ class ProductProvider with ChangeNotifier {
   }
 
   void deleteProduct(String id) async {
-    // ลบใน SQLite (ต้องแปลง id เป็น int ก่อนส่ง)
+    // 1. ลบใน SQLite (ต้องแปลง id เป็น int ก่อนส่ง)
     final dbId = int.tryParse(id);
     if (dbId != null) {
-      await DatabaseService.instance.deleteProduct(dbId);
+      try {
+        await DatabaseService.instance.deleteProduct(dbId);
+        debugPrint("Deleted product with ID: $dbId from database");
+      } catch (e) {
+        debugPrint("Error deleting from database: $e");
+      }
     }
     
-    // ลบในรายการของ Provider เพื่ออัปเดต UI ทันที
+    // 2. ลบในรายการของ Provider เพื่ออัปเดต UI ทันที
     _products.removeWhere((p) => p.id == id);
     notifyListeners();
   }

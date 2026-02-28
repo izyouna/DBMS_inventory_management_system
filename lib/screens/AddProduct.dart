@@ -107,27 +107,27 @@ class _AddProductScreenState extends State<AddProductScreen> {
         imagePath: imagePath,
       );
 
-      if (mounted) {
-        // แสดงแจ้งเตือนสำเร็จ
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'บันทึก "${newProduct.name}" สำเร็จ',
-              style: GoogleFonts.prompt(),
-            ),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 2),
-          ),
-        );
+      if (!mounted) return;
 
-        // ล้างค่าข้อมูลเพื่อรอเพิ่มชิ้นต่อไป
-        _clearFields();
-        Navigator.pop(context, newProduct);
-      }
+      // แสดงแจ้งเตือนสำเร็จ
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'บันทึก "${newProduct.name}" สำเร็จ',
+            style: GoogleFonts.prompt(),
+          ),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+
+      // ส่งข้อมูลกลับและปิดหน้า
+      Navigator.pop(context, newProduct);
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('เกิดข้อผิดพลาด: $e')));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('เกิดข้อผิดพลาด: $e', style: GoogleFonts.prompt())),
+      );
     }
   }
 

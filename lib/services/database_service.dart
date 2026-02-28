@@ -7,6 +7,10 @@ class DatabaseService {
   static Database? _db;
   static final DatabaseService instance = DatabaseService._constructor();
 
+  // ระบบสำรองสำหรับ Web (Memory Storage)
+  final List<Map<String, dynamic>> _webMemoryDb = [];
+  int _webIdCounter = 1;
+
   final String _productTableName = "Product";
   final String _productIdColumnName = "ProductID";
   final String _productNameColumnName = "ProductName";
@@ -21,21 +25,29 @@ class DatabaseService {
 
   DatabaseService._constructor();
 
-  Future<Database> get database async {
+  Future<Database?> get database async {
+    if (kIsWeb) return null; // บนเว็บเราจะไม่ใช้ Database Object ตรงๆ
     if (_db != null) return _db!;
-    _db = await getDatabase();
-    return _db!;
+    try {
+      _db = await getDatabase();
+      return _db;
+    } catch (e) {
+      debugPrint("Database initialization failed: $e");
+      return null;
+    }
   }
 
   Future<Database> getDatabase() async {
-    try {
-      final databaseDirPath = await getDatabasesPath();
-      final databasePath = join(databaseDirPath, "master_db.db");
-      final database = await openDatabase(
-        databasePath,
+    String databasePath;
+    final databaseDirPath = await getDatabasesPath();
+    databasePath = join(databaseDirPath, "master_db.db");
+
+    return await databaseFactory.openDatabase(
+      databasePath,
+      options: OpenDatabaseOptions(
         version: 1,
-        onCreate: (db, version) {
-          db.execute('''
+        onCreate: (db, version) async {
+          await db.execute('''
           CREATE TABLE $_productTableName(
             $_productIdColumnName INTEGER PRIMARY KEY AUTOINCREMENT,
             $_productNameColumnName TEXT NOT NULL,
@@ -50,12 +62,8 @@ class DatabaseService {
           )
           ''');
         },
-      );
-      return database;
-    } catch (e) {
-      debugPrint("Error opening database: $e");
-      rethrow;
-    }
+      ),
+    );
   }
 
   Future<int> addProduct({
@@ -69,8 +77,7 @@ class DatabaseService {
     String? warehouseName,
     String? warehouseLocation,
   }) async {
-    final db = await database;
-    return await db.insert(_productTableName, {
+    final data = {
       _productNameColumnName: name,
       _productCategoryColumnName: category,
       _productTotalUnitColumnName: stock,
@@ -80,17 +87,38 @@ class DatabaseService {
       _productWarehouseIdColumnName: warehouseId,
       _productWarehouseNameColumnName: warehouseName,
       _productWarehouseLocationColumnName: warehouseLocation,
-    }, conflictAlgorithm: ConflictAlgorithm.replace);
+    };
+
+    if (kIsWeb) {
+      final webData = Map<String, dynamic>.from(data);
+      webData[_productIdColumnName] = _webIdCounter++;
+      _webMemoryDb.add(webData);
+      return webData[_productIdColumnName];
+    }
+
+    final db = await database;
+    if (db == null) return -1;
+    return await db.insert(_productTableName, data, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   Future<List<Map<String, dynamic>>> getProducts() async {
+    if (kIsWeb) {
+      return List<Map<String, dynamic>>.from(_webMemoryDb);
+    }
+
     final db = await database;
+    if (db == null) return [];
     return await db.query(_productTableName);
   }
 
-  // ฟังก์ชันลบสินค้าออกจากฐานข้อมูล
   Future<int> deleteProduct(int id) async {
+    if (kIsWeb) {
+      _webMemoryDb.removeWhere((p) => p[_productIdColumnName] == id);
+      return 1;
+    }
+
     final db = await database;
+    if (db == null) return 0;
     return await db.delete(
       _productTableName,
       where: '$_productIdColumnName = ?',
@@ -98,7 +126,6 @@ class DatabaseService {
     );
   }
 
-  // ฟังก์ชันอัปเดตข้อมูลสินค้า
   Future<int> updateProduct({
     required int id,
     required String name,
@@ -111,29 +138,42 @@ class DatabaseService {
     String? warehouseName,
     String? warehouseLocation,
   }) async {
+    final data = {
+      _productNameColumnName: name,
+      _productCategoryColumnName: category,
+      _productTotalUnitColumnName: stock,
+      _productPriceColumnName: price,
+      _productUnitColumnName: unit,
+      _productImagePathColumnName: imagePath,
+      _productWarehouseIdColumnName: warehouseId,
+      _productWarehouseNameColumnName: warehouseName,
+      _productWarehouseLocationColumnName: warehouseLocation,
+    };
+
+    if (kIsWeb) {
+      final index = _webMemoryDb.indexWhere((p) => p[_productIdColumnName] == id);
+      if (index != -1) {
+        final updatedData = Map<String, dynamic>.from(data);
+        updatedData[_productIdColumnName] = id;
+        _webMemoryDb[index] = updatedData;
+        return 1;
+      }
+      return 0;
+    }
+
     final db = await database;
+    if (db == null) return 0;
     return await db.update(
       _productTableName,
-      {
-        _productNameColumnName: name,
-        _productCategoryColumnName: category,
-        _productTotalUnitColumnName: stock,
-        _productPriceColumnName: price,
-        _productUnitColumnName: unit,
-        _productImagePathColumnName: imagePath,
-        _productWarehouseIdColumnName: warehouseId,
-        _productWarehouseNameColumnName: warehouseName,
-        _productWarehouseLocationColumnName: warehouseLocation,
-      },
+      data,
       where: '$_productIdColumnName = ?',
       whereArgs: [id],
     );
   }
 
-  // ฟังก์ชันสำหรับ Debug: ดึงข้อมูลทั้งหมดมาแสดงใน Console
   Future<void> printAllProducts() async {
     final products = await getProducts();
-    print('==================== DATABASE CONTENT ====================');
+    print('==================== DATABASE CONTENT (Platform: ${kIsWeb ? 'Web' : 'Native'}) ====================');
     if (products.isEmpty) {
       print('ฐานข้อมูลว่างเปล่า (Empty)');
     } else {

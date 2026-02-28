@@ -1,7 +1,11 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/material.dart';
 import 'package:inventory_management_system/screens/DebtReport.dart';
 import 'package:provider/provider.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 
 import 'providers/product_provider.dart';
 import 'providers/cart_provider.dart';
@@ -15,11 +19,20 @@ import 'screens/Setting.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // ตั้งค่าฐานข้อมูลให้รันได้ทุกที่ (Android, iOS, Windows, Web)
+  if (kIsWeb) {
+    // สำหรับ Web/Chrome
+    databaseFactory = databaseFactoryFfiWeb;
+  } else if (Platform.isWindows || Platform.isLinux) {
+    // สำหรับ Windows Desktop
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+  }
   
   // ใส่ try-catch แก้ป้องกันแอปค้างที่หน้าจอขาวหากฐานข้อมูลมีปัญหา
   try {
-    // พิมพ์ข้อมูลเพื่อ Debug โดยไม่รอให้เสร็จก่อนเริ่มแอป (หรือใส่ await ถ้าต้องการให้เสร็จก่อน)
-    // แต่บน Windows sqflite อาจจะ crash ถ้าไม่มีการตั้งค่า FFI
+    // พิมพ์ข้อมูลเพื่อ Debug
     await DatabaseService.instance.printAllProducts().catchError((e) {
       debugPrint("Database Error: $e");
     });
