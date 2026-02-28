@@ -21,46 +21,38 @@ class ProductProvider with ChangeNotifier {
     ProductUnit(id: 'u5', label: 'ถุง'),
   ];
 
-  final List<Warehouse> _warehouses = [
-    Warehouse(id: 'w1', name: 'หน้าร้าน', location: 'โซน A'),
-    Warehouse(id: 'w2', name: 'คลังสินค้าหลังร้าน', location: 'โซน B'),
-    Warehouse(id: 'w3', name: 'โรงรถ', location: 'โซน C'),
-  ];
-
-  List<Product> _products = []; // เปลี่ยนจาก late final เป็น List ปกติ
+  List<Warehouse> _warehouses = [];
+  List<Product> _products = [];
 
   ProductProvider() {
-    _products = []; // เริ่มต้นเป็นรายการว่าง
-    loadProductsFromDatabase(); // โหลดจาก DB ทันทีที่สร้าง Provider
+    loadProductsFromDatabase();
   }
 
   // ฟังก์ชันโหลดข้อมูลจากฐานข้อมูล
   Future<void> loadProductsFromDatabase() async {
     try {
+      // 1. โหลด Warehouses ก่อน
+      final dbWarehouses = await DatabaseService.instance.getWarehouses();
+      _warehouses = dbWarehouses.map((map) => Warehouse.fromMap(map)).toList();
+
+      // 2. โหลด Products
       final dbProducts = await DatabaseService.instance.getProducts();
       
       if (dbProducts.isEmpty) {
-        // ถ้าฐานข้อมูลว่าง ให้แสดงข้อมูลเริ่มต้นใน Memory
-        _setInitialFallback();
-        notifyListeners();
-        
-        // สำหรับ Mobile/Windows พยายามบันทึกลง DB จริง
+        // ถ้าฐานข้อมูลว่าง พยายามสร้างสินค้าตัวอย่างลง DB
         if (!kIsWeb) {
-          try {
-            await _setInitialProducts();
-            final updatedDbProducts = await DatabaseService.instance.getProducts();
-            if (updatedDbProducts.isNotEmpty) {
-              _products = updatedDbProducts.map((map) => Product.fromMap(map, _categories, _units)).toList();
-              notifyListeners();
-            }
-          } catch (e) {
-            debugPrint("Failed to save initial products to DB: $e");
+          await _setInitialProducts();
+          final updatedDbProducts = await DatabaseService.instance.getProducts();
+          if (updatedDbProducts.isNotEmpty) {
+            _products = updatedDbProducts.map((map) => Product.fromMap(map, _categories, _units)).toList();
           }
+        } else {
+          _setInitialFallback();
         }
       } else {
         _products = dbProducts.map((map) => Product.fromMap(map, _categories, _units)).toList();
-        notifyListeners();
       }
+      notifyListeners();
     } catch (e) {
       debugPrint("Error loading products: $e");
       _setInitialFallback();
@@ -69,7 +61,7 @@ class ProductProvider with ChangeNotifier {
   }
 
   void _setInitialFallback() {
-    // สินค้าเริ่มต้นสำหรับแสดงผลทันที
+    // ข้อมูลสำรองหากโหลดไม่ได้
     _products = [
       Product(
         id: '1',
@@ -78,22 +70,21 @@ class ProductProvider with ChangeNotifier {
         stock: 10,
         unit: _units[1],
         category: _categories[0],
-        warehouse: _warehouses[1],
+        warehouse: _warehouses.isNotEmpty ? _warehouses[0] : null,
       ),
     ];
   }
 
   Future<void> _setInitialProducts() async {
-    // บันทึกสินค้าเริ่มต้นลงฐานข้อมูลจริงๆ (ถ้ามี)
+    if (_warehouses.isEmpty) return;
+    
     await DatabaseService.instance.addProduct(
       name: 'ปุ๋ยอินทรีย์ 50kg',
       price: 450.0,
       stock: 10,
       unit: _units[1].label,
       category: _categories[0].label,
-      warehouseId: _warehouses[1].id,
-      warehouseName: _warehouses[1].name,
-      warehouseLocation: _warehouses[1].location,
+      warehouseId: _warehouses[0].id,
     );
   }
 
@@ -101,11 +92,10 @@ class ProductProvider with ChangeNotifier {
   List<ProductCategory> get categories => _categories;
   List<ProductUnit> get units => _units;
   List<Warehouse> get warehouses => _warehouses;
-  Map<String, int> _cart = {};
-  Map<String, int> get cart => _cart;
 
-  void addWarehouse(Warehouse warehouse) {
-    _warehouses.add(warehouse);
+  void addWarehouse(String name) async {
+    final id = await DatabaseService.instance.addWarehouse(name);
+    _warehouses.add(Warehouse(id: id.toString(), name: name));
     notifyListeners();
   }
 
@@ -114,7 +104,6 @@ class ProductProvider with ChangeNotifier {
   }
 
   void addProduct(Product product) {
-    // ตรวจสอบว่ามีสินค้า ID นี้อยู่แล้วหรือไม่ เพื่อป้องกันข้อมูลซ้ำซ้อน
     final existingIndex = _products.indexWhere((p) => p.id == product.id);
     if (existingIndex == -1) {
       _products.add(product);
@@ -123,14 +112,12 @@ class ProductProvider with ChangeNotifier {
   }
 
   void updateProduct(Product updatedProduct) async {
-    // 1. อัปเดตใน List ของ Provider ทันทีเพื่อให้ UI เปลี่ยนแปลงเร็วขึ้น
     final index = _products.indexWhere((p) => p.id == updatedProduct.id);
     if (index != -1) {
       _products[index] = updatedProduct;
       notifyListeners();
     }
 
-    // 2. บันทึกลง SQLite ในเบื้องหลัง
     final dbId = int.tryParse(updatedProduct.id);
     if (dbId != null) {
       try {
@@ -143,8 +130,6 @@ class ProductProvider with ChangeNotifier {
           unit: updatedProduct.unit.label,
           imagePath: updatedProduct.imagePath,
           warehouseId: updatedProduct.warehouse?.id,
-          warehouseName: updatedProduct.warehouse?.name,
-          warehouseLocation: updatedProduct.warehouse?.location,
         );
       } catch (e) {
         debugPrint("Error updating database: $e");
@@ -153,18 +138,14 @@ class ProductProvider with ChangeNotifier {
   }
 
   void deleteProduct(String id) async {
-    // 1. ลบใน SQLite (ต้องแปลง id เป็น int ก่อนส่ง)
     final dbId = int.tryParse(id);
     if (dbId != null) {
       try {
         await DatabaseService.instance.deleteProduct(dbId);
-        debugPrint("Deleted product with ID: $dbId from database");
       } catch (e) {
         debugPrint("Error deleting from database: $e");
       }
     }
-    
-    // 2. ลบในรายการของ Provider เพื่ออัปเดต UI ทันที
     _products.removeWhere((p) => p.id == id);
     notifyListeners();
   }
@@ -180,13 +161,10 @@ class ProductProvider with ChangeNotifier {
 
   int get lowStockCount => _products.where((p) => p.isLowStock).length;
 
-  // --- Image Management (Reusable) ---
   XFile? _productImage;
   final ImagePicker _picker = ImagePicker();
-
   XFile? get productImage => _productImage;
 
-  // เลือกรูปภาพจาก Camera หรือ Gallery
   Future<void> pickImage(ImageSource source) async {
     try {
       final pickedFile = await _picker.pickImage(
@@ -195,7 +173,6 @@ class ProductProvider with ChangeNotifier {
         maxHeight: 1000,
         imageQuality: 85,
       );
-
       if (pickedFile != null) {
         _productImage = pickedFile;
         notifyListeners();
@@ -205,7 +182,6 @@ class ProductProvider with ChangeNotifier {
     }
   }
 
-  // ล้างรูปภาพออก
   void clearImage() {
     _productImage = null;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -213,7 +189,6 @@ class ProductProvider with ChangeNotifier {
     });
   }
 
-  // ตั้งค่ารูปภาพโดยตรง (ใช้ตอนกดแก้ไขสินค้า)
   void setImageFromPath(String? path) {
     if (path != null) {
       _productImage = XFile(path);

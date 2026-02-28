@@ -126,7 +126,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                           .map(
                             (w) => DropdownMenuItem(
                               value: w,
-                              child: Text('${w.name} (${w.location})', style: GoogleFonts.prompt()),        
+                              child: Text(w.name, style: GoogleFonts.prompt()),        
                             ),
                           )
                           .toList(),
