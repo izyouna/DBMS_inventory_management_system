@@ -32,7 +32,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
       if (!mounted) return;
       final provider = Provider.of<ProductProvider>(context, listen: false);
       _resetSelections(provider);
-      provider.clearImage(); 
+      provider.clearImage();
     });
   }
 
@@ -67,8 +67,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
     super.dispose();
   }
 
-  void _submit() async{
-    if (_formKey.currentState == null || !_formKey.currentState!.validate() ||
+  void _submit() async {
+    if (_formKey.currentState == null ||
+        !_formKey.currentState!.validate() ||
         _selectedUnit == null ||
         _selectedCategory == null) {
       return;
@@ -84,23 +85,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
       unit: _selectedUnit!,
       category: _selectedCategory!,
       warehouse: _selectedWarehouse,
-      imagePath: provider.productImage?.path, 
+      imagePath: provider.productImage?.path,
     );
 
     // เพิ่มสินค้าเข้าสู่ระบบทันที
     provider.addProduct(product);
 
-    // แสดงแจ้งเตือนสำเร็จ
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('บันทึก "${product.name}" สำเร็จ', style: GoogleFonts.prompt()),
-        backgroundColor: Colors.green,
-        duration: const Duration(seconds: 2),
-      ),
-    );
-
-    // ล้างค่าข้อมูลเพื่อรอเพิ่มชิ้นต่อไป
-    _clearFields();
     try {
       final name = _nameController.text.trim();
       final stock = int.tryParse(_stockController.text.trim()) ?? 0;
@@ -128,6 +118,20 @@ class _AddProductScreenState extends State<AddProductScreen> {
       );
 
       if (mounted) {
+        // แสดงแจ้งเตือนสำเร็จ
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'บันทึก "${product.name}" สำเร็จ',
+              style: GoogleFonts.prompt(),
+            ),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+
+        // ล้างค่าข้อมูลเพื่อรอเพิ่มชิ้นต่อไป
+        _clearFields();
         Navigator.pop(context, newProduct);
       }
     } catch (e) {
@@ -280,11 +284,15 @@ class _AddProductScreenState extends State<AddProductScreen> {
                               .map(
                                 (c) => DropdownMenuItem(
                                   value: c,
-                                  child: Text(c.label, style: GoogleFonts.prompt()),
+                                  child: Text(
+                                    c.label,
+                                    style: GoogleFonts.prompt(),
+                                  ),
                                 ),
                               )
                               .toList(),
-                          onChanged: (v) => setState(() => _selectedCategory = v),
+                          onChanged: (v) =>
+                              setState(() => _selectedCategory = v),
                           decoration: _inputDecoration('หมวดหมู่'),
                         ),
                         const SizedBox(height: 20),
@@ -294,11 +302,15 @@ class _AddProductScreenState extends State<AddProductScreen> {
                               .map(
                                 (w) => DropdownMenuItem(
                                   value: w,
-                                  child: Text(w.name, style: GoogleFonts.prompt()),
+                                  child: Text(
+                                    w.name,
+                                    style: GoogleFonts.prompt(),
+                                  ),
                                 ),
                               )
                               .toList(),
-                          onChanged: (v) => setState(() => _selectedWarehouse = v),
+                          onChanged: (v) =>
+                              setState(() => _selectedWarehouse = v),
                           decoration: _inputDecoration('คลังสินค้า'),
                         ),
                         const SizedBox(height: 20),
@@ -308,7 +320,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
                               .map(
                                 (u) => DropdownMenuItem(
                                   value: u,
-                                  child: Text(u.label, style: GoogleFonts.prompt()),
+                                  child: Text(
+                                    u.label,
+                                    style: GoogleFonts.prompt(),
+                                  ),
                                 ),
                               )
                               .toList(),

@@ -45,7 +45,7 @@ class InventoryItemCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(14),
                     child: kIsWeb
                         ? Image.network(product.imagePath!, fit: BoxFit.cover)
-                        : Image.file(File(product.imagePath!), fit: BoxFit.cover),
+                        : Image.file(File(product.imagePath!),key: ValueKey(product.imagePath!), fit: BoxFit.cover),
                   )
                 : const Icon(Icons.inventory_2_outlined, color: Color(0xFF1E2736)),
           ),

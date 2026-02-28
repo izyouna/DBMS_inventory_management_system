@@ -48,7 +48,7 @@ class StoreItemCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(16),
                     child: kIsWeb
                         ? Image.network(product.imagePath!, fit: BoxFit.cover)
-                        : Image.file(File(product.imagePath!), fit: BoxFit.cover),
+                        : Image.file(File(product.imagePath!),key: ValueKey(product.imagePath!), fit: BoxFit.cover),
                   )
                 : const Center(
                     child: Icon(
