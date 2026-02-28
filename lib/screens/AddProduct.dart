@@ -77,20 +77,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
     final provider = Provider.of<ProductProvider>(context, listen: false);
 
-    final product = Product(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      name: _nameController.text.trim(),
-      stock: int.tryParse(_stockController.text.trim()) ?? 0,
-      price: double.tryParse(_priceController.text.trim()) ?? 0.0,
-      unit: _selectedUnit!,
-      category: _selectedCategory!,
-      warehouse: _selectedWarehouse,
-      imagePath: provider.productImage?.path,
-    );
-
-    // เพิ่มสินค้าเข้าสู่ระบบทันที
-    provider.addProduct(product);
-
     try {
       final name = _nameController.text.trim();
       final stock = int.tryParse(_stockController.text.trim()) ?? 0;
@@ -104,9 +90,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
         unit: _selectedUnit!.label,
         category: _selectedCategory!.label,
         imagePath: imagePath,
+        warehouseId: _selectedWarehouse?.id,
+        warehouseName: _selectedWarehouse?.name,
+        warehouseLocation: _selectedWarehouse?.location,
       );
 
-      // สร้างอ็อบเจกต์ Product เพื่อส่งกลับไปแสดงผลทันที
+      // สร้างอ็อบเจกต์ Product ที่มี ID จริงจาก DB
       final newProduct = Product(
         id: id.toString(),
         name: name,
@@ -114,6 +103,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
         price: price,
         unit: _selectedUnit!,
         category: _selectedCategory!,
+        warehouse: _selectedWarehouse,
         imagePath: imagePath,
       );
 
@@ -122,7 +112,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'บันทึก "${product.name}" สำเร็จ',
+              'บันทึก "${newProduct.name}" สำเร็จ',
               style: GoogleFonts.prompt(),
             ),
             backgroundColor: Colors.green,

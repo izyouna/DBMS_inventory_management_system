@@ -47,19 +47,33 @@ class Product {
     };
   }
 
-  factory Product.fromMap(Map<String, dynamic> map) {
+  factory Product.fromMap(Map<String, dynamic> map, List<ProductCategory> categories, List<ProductUnit> units) {
+    String categoryLabel = map['Category'] ?? '';
+    String unitLabel = map['Unit'] ?? '';
+
+    // ค้นหา Category และ Unit ที่มี Label ตรงกันเพื่อเอา ID จริงมาใช้
+    ProductCategory category = categories.firstWhere(
+      (c) => c.label == categoryLabel,
+      orElse: () => ProductCategory(id: '', label: categoryLabel),
+    );
+
+    ProductUnit unit = units.firstWhere(
+      (u) => u.label == unitLabel,
+      orElse: () => ProductUnit(id: '', label: unitLabel),
+    );
+
     return Product(
       id: map['ProductID']?.toString() ?? '',
       name: map['ProductName'] ?? '',
       stock: map['TotalUnit'] ?? 0,
       price: (map['Price'] ?? 0).toDouble(),
-      unit: ProductUnit(id: '', label: map['Unit'] ?? ''),
-      category: ProductCategory(id: '', label: map['Category'] ?? ''),
-      warehouse: map['warehouseId'] != null
+      unit: unit,
+      category: category,
+      warehouse: map['WarehouseId'] != null
           ? Warehouse(
-              id: map['warehouseId'],
-              name: map['warehouseName'],
-              location: map['warehouseLocation'],
+              id: map['WarehouseId'],
+              name: map['WarehouseName'],
+              location: map['WarehouseLocation'],
             )
           : null,
       imagePath: map['ImagePath'],

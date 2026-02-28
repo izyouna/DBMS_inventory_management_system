@@ -37,32 +37,46 @@ class ProductProvider with ChangeNotifier {
   Future<void> loadProductsFromDatabase() async {
     try {
       final dbProducts = await DatabaseService.instance.getProducts();
-      _products = dbProducts.map((map) => Product.fromMap(map)).toList();
       
-      // ถ้าใน DB ไม่มีข้อมูลเลย ให้ใส่ข้อมูลเริ่มต้น (Optional)
-      if (_products.isEmpty) {
-        _setInitialProducts();
+      if (dbProducts.isEmpty) {
+        // ถ้าใน DB ไม่มีข้อมูลเลย ให้ใส่ข้อมูลเริ่มต้นและบันทึกลง DB
+        await _setInitialProducts();
+        // โหลดใหม่อีกครั้งหลังจากบันทึกแล้วเพื่อให้ได้ ID ที่ถูกต้องจาก DB
+        final updatedDbProducts = await DatabaseService.instance.getProducts();
+        _products = updatedDbProducts.map((map) => Product.fromMap(map, _categories, _units)).toList();
+      } else {
+        _products = dbProducts.map((map) => Product.fromMap(map, _categories, _units)).toList();
       }
     } catch (e) {
       debugPrint("Error loading products: $e");
-      // กรณีโหลดไม่ได้ (เช่น บน Windows ที่ไม่ได้ตั้งค่า) ให้ใช้ข้อมูลเริ่มต้นไปก่อน
-      _setInitialProducts();
+      // กรณีโหลดไม่ได้ (เช่น บน Windows ที่ไม่ได้ตั้งค่า) ให้ใช้ข้อมูลใน Memory ไปก่อน
+      _products = [
+        Product(
+          id: '1',
+          name: 'ปุ๋ยอินทรีย์ 50kg',
+          price: 450.0,
+          stock: 10,
+          unit: _units[1],
+          category: _categories[0],
+          warehouse: _warehouses[1],
+        ),
+      ];
     }
     notifyListeners();
   }
 
-  void _setInitialProducts() {
-    _products = [
-      Product(
-        id: '1',
-        name: 'ปุ๋ยอินทรีย์ 50kg',
-        price: 450.0,
-        stock: 10,
-        unit: _units[1],
-        category: _categories[0],
-        warehouse: _warehouses[1],
-      ),
-    ];
+  Future<void> _setInitialProducts() async {
+    // บันทึกสินค้าเริ่มต้นลงฐานข้อมูลจริงๆ
+    await DatabaseService.instance.addProduct(
+      name: 'ปุ๋ยอินทรีย์ 50kg',
+      price: 450.0,
+      stock: 10,
+      unit: _units[1].label,
+      category: _categories[0].label,
+      warehouseId: _warehouses[1].id,
+      warehouseName: _warehouses[1].name,
+      warehouseLocation: _warehouses[1].location,
+    );
   }
 
   List<Product> get products => [..._products];
@@ -87,24 +101,32 @@ class ProductProvider with ChangeNotifier {
   }
 
   void updateProduct(Product updatedProduct) async {
-    // อัปเดตใน SQLite
-    final dbId = int.tryParse(updatedProduct.id);
-    if (dbId != null) {
-      await DatabaseService.instance.updateProduct(
-        id: dbId,
-        name: updatedProduct.name,
-        category: updatedProduct.category.label,
-        stock: updatedProduct.stock,
-        price: updatedProduct.price,
-        unit: updatedProduct.unit.label,
-        imagePath: updatedProduct.imagePath,
-      );
-    }
-
+    // 1. อัปเดตใน List ของ Provider ทันทีเพื่อให้ UI เปลี่ยนแปลงเร็วขึ้น
     final index = _products.indexWhere((p) => p.id == updatedProduct.id);
     if (index != -1) {
       _products[index] = updatedProduct;
       notifyListeners();
+    }
+
+    // 2. บันทึกลง SQLite ในเบื้องหลัง
+    final dbId = int.tryParse(updatedProduct.id);
+    if (dbId != null) {
+      try {
+        await DatabaseService.instance.updateProduct(
+          id: dbId,
+          name: updatedProduct.name,
+          category: updatedProduct.category.label,
+          stock: updatedProduct.stock,
+          price: updatedProduct.price,
+          unit: updatedProduct.unit.label,
+          imagePath: updatedProduct.imagePath,
+          warehouseId: updatedProduct.warehouse?.id,
+          warehouseName: updatedProduct.warehouse?.name,
+          warehouseLocation: updatedProduct.warehouse?.location,
+        );
+      } catch (e) {
+        debugPrint("Error updating database: $e");
+      }
     }
   }
 

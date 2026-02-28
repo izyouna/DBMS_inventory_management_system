@@ -15,6 +15,9 @@ class DatabaseService {
   final String _productPriceColumnName = "Price";
   final String _productUnitColumnName = "Unit";
   final String _productImagePathColumnName = "ImagePath";
+  final String _productWarehouseIdColumnName = "WarehouseId";
+  final String _productWarehouseNameColumnName = "WarehouseName";
+  final String _productWarehouseLocationColumnName = "WarehouseLocation";
 
   DatabaseService._constructor();
 
@@ -40,7 +43,10 @@ class DatabaseService {
             $_productTotalUnitColumnName INTEGER,
             $_productPriceColumnName REAL,
             $_productUnitColumnName TEXT,
-            $_productImagePathColumnName TEXT
+            $_productImagePathColumnName TEXT,
+            $_productWarehouseIdColumnName TEXT,
+            $_productWarehouseNameColumnName TEXT,
+            $_productWarehouseLocationColumnName TEXT
           )
           ''');
         },
@@ -48,7 +54,6 @@ class DatabaseService {
       return database;
     } catch (e) {
       debugPrint("Error opening database: $e");
-      // ถ้าเปิดไม่ได้จริงๆ บน Windows ให้พยายามใช้ FFI หรืออย่างน้อยก็ไม่ให้แอปค้าง
       rethrow;
     }
   }
@@ -60,6 +65,9 @@ class DatabaseService {
     required double price,
     required String unit,
     String? imagePath,
+    String? warehouseId,
+    String? warehouseName,
+    String? warehouseLocation,
   }) async {
     final db = await database;
     return await db.insert(_productTableName, {
@@ -69,6 +77,9 @@ class DatabaseService {
       _productPriceColumnName: price,
       _productUnitColumnName: unit,
       _productImagePathColumnName: imagePath,
+      _productWarehouseIdColumnName: warehouseId,
+      _productWarehouseNameColumnName: warehouseName,
+      _productWarehouseLocationColumnName: warehouseLocation,
     }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
@@ -96,6 +107,9 @@ class DatabaseService {
     required double price,
     required String unit,
     String? imagePath,
+    String? warehouseId,
+    String? warehouseName,
+    String? warehouseLocation,
   }) async {
     final db = await database;
     return await db.update(
@@ -107,6 +121,9 @@ class DatabaseService {
         _productPriceColumnName: price,
         _productUnitColumnName: unit,
         _productImagePathColumnName: imagePath,
+        _productWarehouseIdColumnName: warehouseId,
+        _productWarehouseNameColumnName: warehouseName,
+        _productWarehouseLocationColumnName: warehouseLocation,
       },
       where: '$_productIdColumnName = ?',
       whereArgs: [id],
