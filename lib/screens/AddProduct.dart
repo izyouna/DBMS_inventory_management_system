@@ -91,8 +91,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
         category: _selectedCategory!.label,
         imagePath: imagePath,
         warehouseId: _selectedWarehouse?.id,
-        warehouseName: _selectedWarehouse?.name,
-        warehouseLocation: _selectedWarehouse?.location,
       );
 
       // สร้างอ็อบเจกต์ Product ที่มี ID จริงจาก DB

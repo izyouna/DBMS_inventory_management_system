@@ -9,6 +9,11 @@ class DatabaseService {
 
   // ระบบสำรองสำหรับ Web (Memory Storage)
   final List<Map<String, dynamic>> _webMemoryDb = [];
+  final List<Map<String, dynamic>> _webWarehouseMemoryDb = [
+    {'WarehouseID': '1', 'WarehouseName': 'หน้าร้าน'},
+    {'WarehouseID': '2', 'WarehouseName': 'โรงรถ'},
+    {'WarehouseID': '3', 'WarehouseName': 'คลังสินค้าหลังร้าน'},
+  ];
   int _webIdCounter = 1;
 
   final String _productTableName = "Product";
@@ -19,9 +24,11 @@ class DatabaseService {
   final String _productPriceColumnName = "Price";
   final String _productUnitColumnName = "Unit";
   final String _productImagePathColumnName = "ImagePath";
-  final String _productWarehouseIdColumnName = "WarehouseId";
-  final String _productWarehouseNameColumnName = "WarehouseName";
-  final String _productWarehouseLocationColumnName = "WarehouseLocation";
+  final String _productWarehouseIdColumnName = "WarehouseID";
+
+  final String _warehouseTableName = "Warehouse";
+  final String _warehouseIdColumnName = "WarehouseID";
+  final String _warehouseNameColumnName = "WarehouseName";
 
   DatabaseService._constructor();
 
@@ -45,8 +52,15 @@ class DatabaseService {
     return await databaseFactory.openDatabase(
       databasePath,
       options: OpenDatabaseOptions(
-        version: 1,
+        version: 3, // เพิ่ม Version เป็น 3 เพื่อให้ Trigger onUpgrade
         onCreate: (db, version) async {
+          await db.execute('''
+          CREATE TABLE $_warehouseTableName(
+            $_warehouseIdColumnName INTEGER PRIMARY KEY AUTOINCREMENT,
+            $_warehouseNameColumnName TEXT NOT NULL
+          )
+          ''');
+
           await db.execute('''
           CREATE TABLE $_productTableName(
             $_productIdColumnName INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -56,16 +70,76 @@ class DatabaseService {
             $_productPriceColumnName REAL,
             $_productUnitColumnName TEXT,
             $_productImagePathColumnName TEXT,
-            $_productWarehouseIdColumnName TEXT,
-            $_productWarehouseNameColumnName TEXT,
-            $_productWarehouseLocationColumnName TEXT
+            $_productWarehouseIdColumnName INTEGER,
+            FOREIGN KEY ($_productWarehouseIdColumnName) REFERENCES $_warehouseTableName($_warehouseIdColumnName)
           )
           ''');
+
+          // เพิ่มข้อมูล Warehouse เริ่มต้น
+          await db.insert(_warehouseTableName, {_warehouseNameColumnName: 'หน้าร้าน'});
+          await db.insert(_warehouseTableName, {_warehouseNameColumnName: 'โรงรถ'});
+          await db.insert(_warehouseTableName, {_warehouseNameColumnName: 'คลังสินค้าหลังร้าน'});
+        },
+        onUpgrade: (db, oldVersion, newVersion) async {
+          if (oldVersion < 3) {
+            // ล้างข้อมูลเก่าและสร้างใหม่เพื่อความถูกต้องของโครงสร้างและข้อมูลเริ่มต้น
+            await db.execute("DROP TABLE IF EXISTS $_productTableName");
+            await db.execute("DROP TABLE IF EXISTS $_warehouseTableName");
+            
+            await db.execute('''
+            CREATE TABLE $_warehouseTableName(
+              $_warehouseIdColumnName INTEGER PRIMARY KEY AUTOINCREMENT,
+              $_warehouseNameColumnName TEXT NOT NULL
+            )
+            ''');
+
+            await db.execute('''
+            CREATE TABLE $_productTableName(
+              $_productIdColumnName INTEGER PRIMARY KEY AUTOINCREMENT,
+              $_productNameColumnName TEXT NOT NULL,
+              $_productCategoryColumnName TEXT,
+              $_productTotalUnitColumnName INTEGER,
+              $_productPriceColumnName REAL,
+              $_productUnitColumnName TEXT,
+              $_productImagePathColumnName TEXT,
+              $_productWarehouseIdColumnName INTEGER,
+              FOREIGN KEY ($_productWarehouseIdColumnName) REFERENCES $_warehouseTableName($_warehouseIdColumnName)
+            )
+            ''');
+
+            await db.insert(_warehouseTableName, {_warehouseNameColumnName: 'หน้าร้าน'});
+            await db.insert(_warehouseTableName, {_warehouseNameColumnName: 'โรงรถ'});
+            await db.insert(_warehouseTableName, {_warehouseNameColumnName: 'คลังสินค้าหลังร้าน'});
+          }
         },
       ),
     );
   }
 
+  // --- Warehouse Methods ---
+  Future<int> addWarehouse(String name) async {
+    final data = {_warehouseNameColumnName: name};
+    if (kIsWeb) {
+      final webData = Map<String, dynamic>.from(data);
+      webData[_warehouseIdColumnName] = (_webWarehouseMemoryDb.length + 1).toString();
+      _webWarehouseMemoryDb.add(webData);
+      return int.parse(webData[_warehouseIdColumnName]);
+    }
+    final db = await database;
+    if (db == null) return -1;
+    return await db.insert(_warehouseTableName, data);
+  }
+
+  Future<List<Map<String, dynamic>>> getWarehouses() async {
+    if (kIsWeb) {
+      return List<Map<String, dynamic>>.from(_webWarehouseMemoryDb);
+    }
+    final db = await database;
+    if (db == null) return [];
+    return await db.query(_warehouseTableName);
+  }
+
+  // --- Product Methods ---
   Future<int> addProduct({
     required String name,
     required String category,
@@ -74,8 +148,6 @@ class DatabaseService {
     required String unit,
     String? imagePath,
     String? warehouseId,
-    String? warehouseName,
-    String? warehouseLocation,
   }) async {
     final data = {
       _productNameColumnName: name,
@@ -84,9 +156,7 @@ class DatabaseService {
       _productPriceColumnName: price,
       _productUnitColumnName: unit,
       _productImagePathColumnName: imagePath,
-      _productWarehouseIdColumnName: warehouseId,
-      _productWarehouseNameColumnName: warehouseName,
-      _productWarehouseLocationColumnName: warehouseLocation,
+      _productWarehouseIdColumnName: warehouseId != null ? int.tryParse(warehouseId) : null,
     };
 
     if (kIsWeb) {
@@ -103,12 +173,27 @@ class DatabaseService {
 
   Future<List<Map<String, dynamic>>> getProducts() async {
     if (kIsWeb) {
-      return List<Map<String, dynamic>>.from(_webMemoryDb);
+      return _webMemoryDb.map((product) {
+        final warehouse = _webWarehouseMemoryDb.firstWhere(
+          (w) => w['WarehouseID'].toString() == product[_productWarehouseIdColumnName]?.toString(),
+          orElse: () => {},
+        );
+        final result = Map<String, dynamic>.from(product);
+        if (warehouse.isNotEmpty) {
+          result['WarehouseName'] = warehouse['WarehouseName'];
+        }
+        return result;
+      }).toList();
     }
 
     final db = await database;
     if (db == null) return [];
-    return await db.query(_productTableName);
+    
+    return await db.rawQuery('''
+      SELECT p.*, w.$_warehouseNameColumnName
+      FROM $_productTableName p
+      LEFT JOIN $_warehouseTableName w ON p.$_productWarehouseIdColumnName = w.$_warehouseIdColumnName
+    ''');
   }
 
   Future<int> deleteProduct(int id) async {
@@ -135,8 +220,6 @@ class DatabaseService {
     required String unit,
     String? imagePath,
     String? warehouseId,
-    String? warehouseName,
-    String? warehouseLocation,
   }) async {
     final data = {
       _productNameColumnName: name,
@@ -145,9 +228,7 @@ class DatabaseService {
       _productPriceColumnName: price,
       _productUnitColumnName: unit,
       _productImagePathColumnName: imagePath,
-      _productWarehouseIdColumnName: warehouseId,
-      _productWarehouseNameColumnName: warehouseName,
-      _productWarehouseLocationColumnName: warehouseLocation,
+      _productWarehouseIdColumnName: warehouseId != null ? int.tryParse(warehouseId) : null,
     };
 
     if (kIsWeb) {
@@ -178,7 +259,7 @@ class DatabaseService {
       print('ฐานข้อมูลว่างเปล่า (Empty)');
     } else {
       for (var p in products) {
-        print('ID: ${p[_productIdColumnName]} | ชื่อ: ${p[_productNameColumnName]} | ราคา: ${p[_productPriceColumnName]} | สต็อก: ${p[_productTotalUnitColumnName]}');
+        print('ID: ${p[_productIdColumnName]} | ชื่อ: ${p[_productNameColumnName]} | คลัง: ${p[_warehouseNameColumnName] ?? 'ไม่มี'}');
       }
     }
     print('==========================================================');

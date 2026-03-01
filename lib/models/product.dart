@@ -32,18 +32,14 @@ class Product {
 
   Map<String, dynamic> toMap() {
     return {
-      'id': id,
-      'name': name,
-      'stock': stock,
-      'price': price,
-      'unitId': unit.id,
-      'unitLabel': unit.label,
-      'categoryId': category.id,
-      'categoryLabel': category.label,
-      'warehouseId': warehouse?.id,
-      'warehouseName': warehouse?.name,
-      'warehouseLocation': warehouse?.location,
-      'imagePath': imagePath,
+      'ProductID': id,
+      'ProductName': name,
+      'TotalUnit': stock,
+      'Price': price,
+      'Category': category.label,
+      'Unit': unit.label,
+      'WarehouseID': warehouse?.id,
+      'ImagePath': imagePath,
     };
   }
 
@@ -69,11 +65,10 @@ class Product {
       price: (map['Price'] ?? 0).toDouble(),
       unit: unit,
       category: category,
-      warehouse: map['WarehouseId'] != null
+      warehouse: map['WarehouseID'] != null
           ? Warehouse(
-              id: map['WarehouseId'],
-              name: map['WarehouseName'],
-              location: map['WarehouseLocation'],
+              id: map['WarehouseID'].toString(),
+              name: map['WarehouseName'] ?? 'ไม่ระบุคลัง',
             )
           : null,
       imagePath: map['ImagePath'],
