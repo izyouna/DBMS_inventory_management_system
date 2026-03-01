@@ -317,8 +317,6 @@ class _PurchaseOrderCartScreenState extends State<PurchaseOrderCartScreen> {
               // Loop เพิ่มสต็อกสินค้า
               for (var item in po.items.values) {
                 final currentProduct = item.product;
-                // ในตัวอย่างนี้ เราอัปเดตผ่าน productProvider.updateProduct
-                // โดยคำนวณสต็อกใหม่ = สต็อกเดิม + จำนวนที่สั่งซื้อ
                 productProvider.updateProduct(
                   currentProduct..stock = currentProduct.stock + item.quantity
                 );

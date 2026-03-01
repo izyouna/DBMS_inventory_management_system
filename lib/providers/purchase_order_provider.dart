@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import '../models/product.dart';
-import '../models/cart_item.dart';
 
 class PurchaseOrderItem {
   final Product product;
