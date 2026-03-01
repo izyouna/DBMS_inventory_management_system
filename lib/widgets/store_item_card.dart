@@ -9,6 +9,7 @@ class StoreItemCard extends StatelessWidget {
   final int inCart;
   final VoidCallback onAdd;
   final VoidCallback onRemove;
+  final bool isPurchaseOrder; // เพิ่มตัวแปรนี้
 
   const StoreItemCard({
     super.key,
@@ -16,6 +17,7 @@ class StoreItemCard extends StatelessWidget {
     required this.inCart,
     required this.onAdd,
     required this.onRemove,
+    this.isPurchaseOrder = false, // ค่าเริ่มต้นเป็น false
   });
 
   @override
@@ -113,16 +115,16 @@ class StoreItemCard extends StatelessWidget {
                     IconButton(
                       padding: EdgeInsets.zero,
                       icon: const Icon(Icons.add_circle_outline, size: 20),
-                      onPressed: product.stock <= inCart ? null : onAdd,
+                      onPressed: (isPurchaseOrder || product.stock > inCart) ? onAdd : null,
                     ),
                   ],
                 )
               else
                 TextButton(
-                  onPressed: product.stock == 0 ? null : onAdd,
+                  onPressed: (isPurchaseOrder || product.stock > 0) ? onAdd : null,
                   style: TextButton.styleFrom(
                     foregroundColor: Colors.white,
-                    backgroundColor: product.stock == 0
+                    backgroundColor: (!isPurchaseOrder && product.stock == 0)
                         ? Colors.grey
                         : const Color.fromARGB(255, 30, 39, 54),
                     padding: const EdgeInsets.symmetric(horizontal: 12),

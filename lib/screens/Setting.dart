@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'PurchaseOrder.dart'; // เพิ่ม import
 
 class SettingScreen extends StatelessWidget {
   const SettingScreen({super.key});
@@ -7,8 +8,9 @@ class SettingScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = [
-      {'icon': Icons.storefront, 'title': 'ข้อมูลร้านค้า'},
+      {'icon': Icons.storefront, 'title': 'ข้อมูร้านค้า'},
       {'icon': Icons.receipt_long, 'title': 'รูปแบบใบเสร็จ'},
+      {'icon': Icons.inventory_2, 'title': 'ใบสั่งซื้อ'},
       {'icon': Icons.payments_outlined, 'title': 'ช่องทางการชำระเงิน'},
       {'icon': Icons.account_circle_outlined, 'title': 'ผู้ใช้งานระบบ'},
       {'icon': Icons.lock_outline, 'title': 'ความปลอดภัย'},
@@ -46,20 +48,26 @@ class SettingScreen extends StatelessWidget {
             ),
             child: ListTile(
               leading: CircleAvatar(
-                backgroundColor:
-                    const Color.fromARGB(255, 226, 232, 240),
-                child: Icon(item['icon'] as IconData,
-                    color: const Color(0xFF1E2736)),
+                backgroundColor: const Color.fromARGB(255, 226, 232, 240),
+                child: Icon(
+                  item['icon'] as IconData,
+                  color: const Color(0xFF1E2736),
+                ),
               ),
               title: Text(
                 item['title'] as String,
-                style: GoogleFonts.prompt(
-                  fontWeight: FontWeight.w600,
-                ),
+                style: GoogleFonts.prompt(fontWeight: FontWeight.w600),
               ),
               trailing: const Icon(Icons.chevron_right),
               onTap: () {
-                // ไว้ต่อยอดหน้า setting ย่อยทีหลัง
+                if (item['title'] == 'ใบสั่งซื้อ') {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const PurchaseOrderScreen(),
+                    ),
+                  );
+                }
               },
             ),
           );
