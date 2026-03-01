@@ -181,7 +181,7 @@ class _MainNavScreenState extends State<MainNavScreen> {
                 ),
                 child: const Icon(Icons.history_edu_outlined),
               ),
-              label: 'ลูกหนี้',
+              label: 'ค้างชำระ',
             ),
             BottomNavigationBarItem(
               icon: const Icon(Icons.auto_graph_outlined),
