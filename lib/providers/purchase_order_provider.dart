@@ -46,6 +46,35 @@ class PurchaseOrderProvider with ChangeNotifier {
     }
   }
 
+  Future<void> payDebt(String poId) async {
+    // วิธีเก่า (จ่ายครบทีเดียว) จะถูกแทนที่ด้วยระบบจ่ายรายครั้ง
+    // แต่เรายังเก็บไว้เผื่อเรียกใช้
+    final success = await DatabaseService.instance.payPurchaseDebt(poId);
+    if (success) {
+      await loadPurchaseHistory();
+    }
+  }
+
+  Future<bool> addPayment({
+    required String poId,
+    required double amount,
+    String? imagePath,
+  }) async {
+    final success = await DatabaseService.instance.addPurchasePayment(
+      poId: poId,
+      amount: amount,
+      imagePath: imagePath,
+    );
+    if (success) {
+      await loadPurchaseHistory();
+    }
+    return success;
+  }
+
+  Future<List<Map<String, dynamic>>> getPaymentHistory(String poId) async {
+    return await DatabaseService.instance.getPurchasePaymentHistory(poId);
+  }
+
   Future<List<Map<String, dynamic>>> getPurchaseOrderDetails(String poId) async {
     try {
       return await DatabaseService.instance.getPurchaseOrderDetails(poId);

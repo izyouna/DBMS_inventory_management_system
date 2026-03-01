@@ -31,6 +31,7 @@ class DatabaseService {
   final String _purchaseOrderTableName = "PurchaseOrder";
   final String _purchaseDetailTableName = "PurchaseDetail";
   final String _purchaseTypeTableName = "PurchaseType";
+  final String _creditPaymentHistoryTableName = "CreditPaymentHistory";
 
   // Product Columns
   final String _productIdColumnName = "ProductID";
@@ -66,14 +67,21 @@ class DatabaseService {
   final String _poIdColumnName = "POID";
   final String _poReceiveDateColumnName = "ReceiveDate";
   final String _poTotalCostColumnName = "TotalCost";
+  final String _poPaidAmountColumnName = "PaidAmount"; 
   final String _poBillImagePathColumnName = "BillImagePath";
-  final String _poStatusColumnName = "Status"; // Confirmed, Cancelled
-  final String _poPaymentStatusColumnName = "PaymentStatus"; // Paid, Pending
+  final String _poStatusColumnName = "Status"; 
+  final String _poPaymentStatusColumnName = "PaymentStatus"; 
   final String _poTypeIdColumnName = "PTID";
 
   // PurchaseType Columns
   final String _ptIdColumnName = "PTID";
   final String _ptNameColumnName = "PTName";
+
+  // CreditPaymentHistory Columns
+  final String _cphIdColumnName = "PaymentID";
+  final String _cphAmountPaidColumnName = "AmountPaid";
+  final String _cphPaidDateColumnName = "PaidDate";
+  final String _cphPaidImagePathColumnName = "PaidImagePath";
 
   DatabaseService._constructor();
 
@@ -97,13 +105,14 @@ class DatabaseService {
     return await databaseFactory.openDatabase(
       databasePath,
       options: OpenDatabaseOptions(
-        version: 13,
+        version: 14,
         onCreate: (db, version) async {
           await _createTables(db);
           await _seedInitialData(db);
         },
         onUpgrade: (db, oldVersion, newVersion) async {
-          if (oldVersion < 13) {
+          if (oldVersion < 14) {
+            await db.execute("DROP TABLE IF EXISTS $_creditPaymentHistoryTableName");
             await db.execute("DROP TABLE IF EXISTS $_purchaseDetailTableName");
             await db.execute("DROP TABLE IF EXISTS $_purchaseOrderTableName");
             await db.execute("DROP TABLE IF EXISTS $_purchaseTypeTableName");
@@ -185,6 +194,7 @@ class DatabaseService {
         $_poIdColumnName TEXT PRIMARY KEY,
         $_poReceiveDateColumnName TEXT NOT NULL,
         $_poTotalCostColumnName REAL NOT NULL,
+        $_poPaidAmountColumnName REAL NOT NULL DEFAULT 0,
         $_poBillImagePathColumnName TEXT,
         $_poStatusColumnName TEXT NOT NULL,
         $_poPaymentStatusColumnName TEXT NOT NULL,
@@ -202,6 +212,17 @@ class DatabaseService {
         PRIMARY KEY ($_poIdColumnName, $_productIdColumnName),
         FOREIGN KEY ($_poIdColumnName) REFERENCES $_purchaseOrderTableName($_poIdColumnName),
         FOREIGN KEY ($_productIdColumnName) REFERENCES $_productTableName($_productIdColumnName)
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE $_creditPaymentHistoryTableName(
+        $_cphIdColumnName INTEGER PRIMARY KEY AUTOINCREMENT,
+        $_poIdColumnName TEXT NOT NULL,
+        $_cphAmountPaidColumnName REAL NOT NULL,
+        $_cphPaidDateColumnName TEXT NOT NULL,
+        $_cphPaidImagePathColumnName TEXT,
+        FOREIGN KEY ($_poIdColumnName) REFERENCES $_purchaseOrderTableName($_poIdColumnName)
       )
     ''');
   }
@@ -543,6 +564,7 @@ class DatabaseService {
         _poIdColumnName: poId,
         _poReceiveDateColumnName: receiveDate,
         _poTotalCostColumnName: totalCost,
+        _poPaidAmountColumnName: paymentStatus == 'Paid' ? totalCost : 0, // ถ้าจ่ายสดให้ยอดจ่ายครบเลย
         _poBillImagePathColumnName: billImagePath,
         _poStatusColumnName: 'Confirmed', 
         _poPaymentStatusColumnName: paymentStatus,
@@ -605,6 +627,83 @@ class DatabaseService {
 
       return true;
     });
+  }
+
+  Future<bool> addPurchasePayment({
+    required String poId,
+    required double amount,
+    String? imagePath,
+  }) async {
+    final db = await database;
+    if (db == null) return false;
+
+    return await db.transaction((txn) async {
+      final List<Map<String, dynamic>> poResults = await txn.query(
+        _purchaseOrderTableName,
+        where: '$_poIdColumnName = ?',
+        whereArgs: [poId],
+      );
+      if (poResults.isEmpty) return false;
+      final po = poResults.first;
+
+      await txn.insert(_creditPaymentHistoryTableName, {
+        _poIdColumnName: poId,
+        _cphAmountPaidColumnName: amount,
+        _cphPaidDateColumnName: DateTime.now().toIso8601String(),
+        _cphPaidImagePathColumnName: imagePath,
+      });
+
+      final double currentPaid = (po[_poPaidAmountColumnName] as num).toDouble();
+      final double totalCost = (po[_poTotalCostColumnName] as num).toDouble();
+      final double newPaid = currentPaid + amount;
+
+      final Map<String, dynamic> updateData = {
+        _poPaidAmountColumnName: newPaid,
+      };
+
+      if (newPaid >= totalCost) {
+        updateData[_poPaymentStatusColumnName] = 'Paid';
+      }
+
+      await txn.update(
+        _purchaseOrderTableName,
+        updateData,
+        where: '$_poIdColumnName = ?',
+        whereArgs: [poId],
+      );
+
+      return true;
+    });
+  }
+
+  Future<bool> payPurchaseDebt(String poId) async {
+    final db = await database;
+    if (db == null) return false;
+    
+    final poResults = await db.query(
+      _purchaseOrderTableName,
+      where: '$_poIdColumnName = ?',
+      whereArgs: [poId],
+    );
+    if (poResults.isEmpty) return false;
+    final totalCost = (poResults.first[_poTotalCostColumnName] as num).toDouble();
+    final currentPaid = (poResults.first[_poPaidAmountColumnName] as num).toDouble();
+    final balance = totalCost - currentPaid;
+
+    if (balance <= 0) return true;
+
+    return await addPurchasePayment(poId: poId, amount: balance);
+  }
+
+  Future<List<Map<String, dynamic>>> getPurchasePaymentHistory(String poId) async {
+    final db = await database;
+    if (db == null) return [];
+    return await db.query(
+      _creditPaymentHistoryTableName,
+      where: '$_poIdColumnName = ?',
+      whereArgs: [poId], // เพิ่มพารามิเตอร์ที่ขาดไป
+      orderBy: '$_cphPaidDateColumnName DESC',
+    );
   }
 
   Future<List<Map<String, dynamic>>> getPurchaseOrders() async {

@@ -30,7 +30,6 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
   Widget build(BuildContext context) {
     final poProvider = Provider.of<PurchaseOrderProvider>(context);
     
-    // กรองรายการตาม Filter ที่เลือก
     final filteredHistory = poProvider.purchaseHistory.where((po) {
       if (_selectedFilter == 'ทั้งหมด') return true;
       if (_selectedFilter == 'เงินสด') return po['PTName'] == 'เงินสด';
@@ -58,7 +57,6 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
       ),
       body: Column(
         children: [
-          // แถบ Filter ด้านบน
           Container(
             color: Colors.white,
             padding: const EdgeInsets.symmetric(vertical: 12),
@@ -91,7 +89,6 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
             ),
           ),
           const Divider(height: 1, color: Color(0xFFEEEEEE)),
-          // รายการประวัติ
           Expanded(
             child: filteredHistory.isEmpty
                 ? Center(
@@ -126,13 +123,11 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
                                 ),
                               ),
                               const SizedBox(width: 4),
-                              // Badge สถานะใบสั่งซื้อ
                               _buildStatusBadge(
                                 isConfirmed ? 'ยืนยันแล้ว' : 'ยกเลิกแล้ว',
                                 isConfirmed ? Colors.green : Colors.red,
                               ),
                               const SizedBox(width: 4),
-                              // Badge สถานะการชำระเงิน
                               _buildStatusBadge(
                                 isPaid ? 'ชำระแล้ว' : 'ค้างชำระ',
                                 isPaid ? Colors.blue : Colors.orange,
@@ -206,6 +201,7 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
     );
 
     final items = await poProvider.getPurchaseOrderDetails(po['POID']);
+    final paymentHistory = await poProvider.getPaymentHistory(po['POID']);
     
     if (!mounted) return;
     Navigator.pop(context);
@@ -242,19 +238,22 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
         ),
         content: SizedBox(
           width: double.maxFinite,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Divider(),
-              if (items.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Text('ไม่พบรายการสินค้า', style: GoogleFonts.prompt(color: Colors.grey)),
-                )
-              else
-                Flexible(
-                  child: ListView.builder(
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Divider(),
+                Text('รายการสินค้า', style: GoogleFonts.prompt(fontWeight: FontWeight.bold, fontSize: 14)),
+                if (items.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Text('ไม่พบรายการสินค้า', style: GoogleFonts.prompt(color: Colors.grey)),
+                  )
+                else
+                  ListView.builder(
                     shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
                     itemCount: items.length,
                     itemBuilder: (context, index) {
                       final item = items[index];
@@ -287,42 +286,99 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
                       );
                     },
                   ),
-                ),
-              const Divider(),
-              if (po['BillImagePath'] != null) ...[
-                const SizedBox(height: 8),
-                Text('หลักฐานใบเสร็จ / บิล', style: GoogleFonts.prompt(fontWeight: FontWeight.w600, fontSize: 14)),
-                const SizedBox(height: 8),
-                GestureDetector(
-                  onTap: () => _showFullScreenImage(context, po['BillImagePath']),
-                  child: Container(
-                    height: 120,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey[300]!),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: kIsWeb
-                          ? Image.network(po['BillImagePath'], fit: BoxFit.cover)
-                          : Image.file(File(po['BillImagePath']), fit: BoxFit.cover),
+                const Divider(),
+                if (po['BillImagePath'] != null) ...[
+                  const SizedBox(height: 8),
+                  Text('หลักฐานใบเสร็จ / บิล', style: GoogleFonts.prompt(fontWeight: FontWeight.w600, fontSize: 14)),
+                  const SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: () => _showFullScreenImage(context, po['BillImagePath']),
+                    child: Container(
+                      height: 100,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey[300]!),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: kIsWeb
+                            ? Image.network(po['BillImagePath'], fit: BoxFit.cover)
+                            : Image.file(File(po['BillImagePath']), fit: BoxFit.cover),
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                const Divider(),
-              ],
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('ยอดรวมต้นทุน', style: GoogleFonts.prompt(fontWeight: FontWeight.bold, fontSize: 16)),
-                  Text('฿${(po['TotalCost'] as num).toStringAsFixed(2)}', 
-                    style: GoogleFonts.prompt(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.blue)),
+                  const SizedBox(height: 12),
+                  const Divider(),
                 ],
-              ),
-            ],
+                
+                // ประวัติการชำระเงิน (สำหรับบิลเครดิต)
+                if (paymentHistory.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text('ประวัติการชำระเงิน', style: GoogleFonts.prompt(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.blue[800])),
+                  const SizedBox(height: 8),
+                  ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: paymentHistory.length,
+                    itemBuilder: (ctx, i) {
+                      final pay = paymentHistory[i];
+                      final payDate = DateTime.parse(pay['PaidDate']);
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4.0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('฿${(pay['AmountPaid'] as num).toStringAsFixed(2)}', 
+                                  style: GoogleFonts.prompt(fontSize: 13, fontWeight: FontWeight.bold)),
+                                Text(payDate.toString().split('.')[0], style: GoogleFonts.prompt(fontSize: 11, color: Colors.grey)),
+                              ],
+                            ),
+                            if (pay['PaidImagePath'] != null)
+                              IconButton(
+                                icon: const Icon(Icons.image_outlined, size: 20, color: Colors.blue),
+                                onPressed: () => _showFullScreenImage(context, pay['PaidImagePath']),
+                              ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                  const Divider(),
+                ],
+
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('ยอดรวมต้นทุน', style: GoogleFonts.prompt(fontWeight: FontWeight.bold, fontSize: 16)),
+                    Text('฿${(po['TotalCost'] as num).toStringAsFixed(2)}', 
+                      style: GoogleFonts.prompt(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.blue)),
+                  ],
+                ),
+                if (!isPaid) ...[
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('ชำระแล้วสะสม', style: GoogleFonts.prompt(fontSize: 14, color: Colors.green[700])),
+                      Text('฿${(po['PaidAmount'] as num).toStringAsFixed(2)}', 
+                        style: GoogleFonts.prompt(fontSize: 14, color: Colors.green[700])),
+                    ],
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('ยอดคงเหลือ', style: GoogleFonts.prompt(fontSize: 14, color: Colors.red)),
+                      Text('฿${((po['TotalCost'] as num) - (po['PaidAmount'] as num)).toStringAsFixed(2)}', 
+                        style: GoogleFonts.prompt(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.red)),
+                    ],
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
         actions: [
@@ -351,8 +407,8 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
           TextButton(onPressed: () => Navigator.pop(ctx), child: Text('ไม่ยกเลิก', style: GoogleFonts.prompt())),
           TextButton(
             onPressed: () async {
-              Navigator.pop(ctx); // ปิดการยืนยัน
-              Navigator.pop(context); // ปิดหน้าต่างรายละเอียด
+              Navigator.pop(ctx); 
+              Navigator.pop(context); 
               
               showDialog(
                 context: context,
@@ -363,7 +419,7 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
               final success = await DatabaseService.instance.cancelPurchaseOrder(poId);
               
               if (!mounted) return;
-              Navigator.pop(context); // ปิด Loading
+              Navigator.pop(context); 
 
               if (success) {
                 await poProvider.loadPurchaseHistory();
