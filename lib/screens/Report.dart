@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
 import '../providers/product_provider.dart';
 import '../models/order.dart';
-import '../models/cart_item.dart';
 import '../services/pdf_service.dart';
 
 class ReportScreen extends StatefulWidget {

@@ -1,6 +1,5 @@
 import 'cart_item.dart';
 import 'customer.dart';
-import 'product.dart';
 
 class Order {
   final String id;

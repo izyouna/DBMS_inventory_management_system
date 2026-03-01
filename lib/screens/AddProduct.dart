@@ -46,18 +46,18 @@ class _AddProductScreenState extends State<AddProductScreen> {
     });
   }
 
-  void _clearFields() {
-    _nameController.clear();
-    _stockController.clear();
-    _priceController.clear();
-    final provider = Provider.of<ProductProvider>(context, listen: false);
-    provider.clearImage();
-    _resetSelections(provider);
-    _formKey.currentState?.reset();
-    if (provider.units.isNotEmpty) _selectedUnit = provider.units[0];
-    if (provider.categories.isNotEmpty)
-      _selectedCategory = provider.categories[0];
-  }
+  // void _clearFields() {
+  //   _nameController.clear();
+  //   _stockController.clear();
+  //   _priceController.clear();
+  //   final provider = Provider.of<ProductProvider>(context, listen: false);
+  //   provider.clearImage();
+  //   _resetSelections(provider);
+  //   _formKey.currentState?.reset();
+  //   if (provider.units.isNotEmpty) _selectedUnit = provider.units[0];
+  //   if (provider.categories.isNotEmpty)
+  //     _selectedCategory = provider.categories[0];
+  // }
 
   @override
   void dispose() {
