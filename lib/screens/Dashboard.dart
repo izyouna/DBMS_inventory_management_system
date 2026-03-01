@@ -20,9 +20,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final productProvider = Provider.of<ProductProvider>(context);
     final cartProvider = Provider.of<CartProvider>(context);
 
+    // กรองเฉพาะบิลที่ยืนยันแล้ว
+    final confirmedOrders = cartProvider.orders.where((o) => o.orderStatus == 'Confirmed').toList();
+
     // คำนวณยอดขายวันนี้
     final now = DateTime.now();
-    final todaySales = cartProvider.orders
+    final todaySales = confirmedOrders
         .where(
           (o) =>
               o.dateTime.day == now.day &&
@@ -32,17 +35,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
         .fold(0.0, (sum, o) => sum + o.totalAmount);
 
     // คำนวณยอดขายเดือนนี้
-    final monthSales = cartProvider.orders
+    final monthSales = confirmedOrders
         .where(
           (o) => o.dateTime.month == now.month && o.dateTime.year == now.year,
         )
         .fold(0.0, (sum, o) => sum + o.totalAmount);
 
-    // คำนวณยอดหนี้คงค้าง
-    final totalDebt = cartProvider.unpaidOrders.fold(
-      0.0,
-      (sum, o) => sum + o.totalAmount,
-    );
+    // คำนวณยอดหนี้คงค้างเฉพาะบิลที่ยังไม่ถูกยกเลิก
+    final totalDebt = cartProvider.unpaidOrders
+        .where((o) => o.orderStatus == 'Confirmed')
+        .fold(
+          0.0,
+          (sum, o) => sum + o.totalAmount,
+        );
 
     // เตรียมข้อมูลกราฟ 7 วันล่าสุด
     final List<BarChartGroupData> barGroups = [];
@@ -53,7 +58,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final dayLabel = DateFormat('E').format(date); // Mon, Tue, ...
       days.add(dayLabel);
 
-      final dailyTotal = cartProvider.orders
+      final dailyTotal = confirmedOrders
           .where(
             (o) =>
                 o.dateTime.day == date.day &&

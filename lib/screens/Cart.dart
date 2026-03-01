@@ -105,7 +105,13 @@ class _CartScreenState extends State<CartScreen> {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10, offset: const Offset(0, -5))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 10, 
+            offset: const Offset(0, -5),
+          ),
+        ],
       ),
       child: Column(
         children: [
@@ -167,12 +173,13 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
-  void _processCheckout(BuildContext context, CartProvider cart, PaymentMethod method) {
-    final productProvider = Provider.of<ProductProvider>(context, listen: false);
+  void _processCheckout(BuildContext context, CartProvider cart, PaymentMethod method) async {
+    // 1. ปิด Bottom Sheet ทันทีเพื่อให้ UI ตอบสนองเร็ว
+    Navigator.pop(context);
 
     // Validation: ถ้าเป็นขายเชื่อ ต้องมีข้อมูลลูกค้า
     if (method is CreditPayment && (_nameController.text.isEmpty || _phoneController.text.isEmpty)) {
-      Navigator.pop(context);
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('กรุณากรอกข้อมูลลูกค้าก่อนทำการขายเชื่อ', style: GoogleFonts.prompt()),
@@ -191,18 +198,45 @@ class _CartScreenState extends State<CartScreen> {
       );
     }
 
-    // ตัดสต็อกสินค้าก่อนทำรายการสำเร็จ
-    for (var item in cart.items.values) {
-      productProvider.reduceStock(item.product.id, item.quantity);
-    }
+    // 2. แสดง Loading โดยรอให้ Animation เดิมจบก่อนเล็กน้อย
+    if (!context.mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(child: CircularProgressIndicator(color: Colors.blue)),
+    );
 
-    final order = cart.checkout(method, customer: customer);
-    Navigator.pop(context); 
-    
-    _nameController.clear();
-    _phoneController.clear();
-    
-    _showSuccessDialog(context, order);
+    try {
+      // 3. ปล่อยให้ UI แสดง Spinner ก่อนเริ่มงานหนัก
+      await Future.delayed(const Duration(milliseconds: 300));
+
+      // 4. บันทึกข้อมูล (Heavy Task)
+      final order = await cart.checkout(method, customer: customer);
+      
+      if (!context.mounted) return;
+      Navigator.pop(context); // ปิด Loading ทันทีที่บันทึกเสร็จ
+      
+      _nameController.clear();
+      _phoneController.clear();
+      
+      // 5. แสดง Success Dialog
+      if (!context.mounted) return;
+      _showSuccessDialog(context, order);
+
+      // 6. โหลดข้อมูลสต็อกใหม่แบบ Background (ไม่ให้ขวาง UI หน้าความสำเร็จ)
+      Future.microtask(() async {
+        if (!context.mounted) return;
+        final productProvider = Provider.of<ProductProvider>(context, listen: false);
+        await productProvider.loadProductsFromDatabase();
+      });
+
+    } catch (e) {
+      if (!context.mounted) return;
+      Navigator.pop(context); // ปิด Loading
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('เกิดข้อผิดพลาด: $e', style: GoogleFonts.prompt())),
+      );
+    }
   }
 
   void _showSuccessDialog(BuildContext context, Order order) {
@@ -234,8 +268,11 @@ class _CartScreenState extends State<CartScreen> {
             ),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text('ตกลง', style: GoogleFonts.prompt()),
+            onPressed: () {
+              Navigator.pop(ctx); // ปิดหน้าต่าง Dialog
+              Navigator.pop(context); // ปิดหน้าตะกร้าสินค้าเพื่อกลับไปหน้าขายสินค้า
+            },
+            child: Text('ตกลง', style: GoogleFonts.prompt(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
