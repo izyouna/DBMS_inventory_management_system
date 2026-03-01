@@ -64,7 +64,7 @@ class ProductProvider with ChangeNotifier {
     // ข้อมูลสำรองหากโหลดไม่ได้
     _products = [
       Product(
-        id: '1',
+        id: 'P1',
         name: 'ปุ๋ยอินทรีย์ 50kg',
         price: 450.0,
         stock: 10,
@@ -95,7 +95,7 @@ class ProductProvider with ChangeNotifier {
 
   void addWarehouse(String name) async {
     final id = await DatabaseService.instance.addWarehouse(name);
-    _warehouses.add(Warehouse(id: id.toString(), name: name));
+    _warehouses.add(Warehouse(id: id, name: name));
     notifyListeners();
   }
 
@@ -118,44 +118,53 @@ class ProductProvider with ChangeNotifier {
       notifyListeners();
     }
 
-    final dbId = int.tryParse(updatedProduct.id);
-    if (dbId != null) {
-      try {
-        await DatabaseService.instance.updateProduct(
-          id: dbId,
-          name: updatedProduct.name,
-          category: updatedProduct.category.label,
-          stock: updatedProduct.stock,
-          price: updatedProduct.price,
-          unit: updatedProduct.unit.label,
-          imagePath: updatedProduct.imagePath,
-          warehouseId: updatedProduct.warehouse?.id,
-        );
-      } catch (e) {
-        debugPrint("Error updating database: $e");
-      }
+    try {
+      await DatabaseService.instance.updateProduct(
+        id: updatedProduct.id,
+        name: updatedProduct.name,
+        category: updatedProduct.category.label,
+        stock: updatedProduct.stock,
+        price: updatedProduct.price,
+        unit: updatedProduct.unit.label,
+        imagePath: updatedProduct.imagePath,
+        warehouseId: updatedProduct.warehouse?.id,
+      );
+    } catch (e) {
+      debugPrint("Error updating database: $e");
     }
   }
 
   void deleteProduct(String id) async {
-    final dbId = int.tryParse(id);
-    if (dbId != null) {
-      try {
-        await DatabaseService.instance.deleteProduct(dbId);
-      } catch (e) {
-        debugPrint("Error deleting from database: $e");
-      }
+    try {
+      await DatabaseService.instance.deleteProduct(id);
+    } catch (e) {
+      debugPrint("Error deleting from database: $e");
     }
     _products.removeWhere((p) => p.id == id);
     notifyListeners();
   }
 
-  void reduceStock(String productId, int quantity) {
+  void reduceStock(String productId, int quantity) async {
     final index = _products.indexWhere((p) => p.id == productId);
     if (index != -1) {
-      _products[index].stock -= quantity;
-      if (_products[index].stock < 0) _products[index].stock = 0;
+      final newStock = _products[index].stock - quantity;
+      _products[index].stock = newStock < 0 ? 0 : newStock;
       notifyListeners();
+
+      try {
+        await DatabaseService.instance.updateProduct(
+          id: productId,
+          name: _products[index].name,
+          category: _products[index].category.label,
+          stock: _products[index].stock,
+          price: _products[index].price,
+          unit: _products[index].unit.label,
+          imagePath: _products[index].imagePath,
+          warehouseId: _products[index].warehouse?.id,
+        );
+      } catch (e) {
+        debugPrint("Error updating stock in DB: $e");
+      }
     }
   }
 
