@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
@@ -10,8 +11,7 @@ class PurchaseOrderCartScreen extends StatefulWidget {
   const PurchaseOrderCartScreen({super.key});
 
   @override
-  State<PurchaseOrderCartScreen> createState() =>
-      _PurchaseOrderCartScreenState();
+  State<PurchaseOrderCartScreen> createState() => _PurchaseOrderCartScreenState();
 }
 
 class _PurchaseOrderCartScreenState extends State<PurchaseOrderCartScreen> {
@@ -44,11 +44,10 @@ class _PurchaseOrderCartScreenState extends State<PurchaseOrderCartScreen> {
 
     return Scaffold(
       backgroundColor: Colors.white,
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(
-        title: Text(
-          'สรุปรายการสั่งซื้อ',
-          style: GoogleFonts.prompt(fontWeight: FontWeight.bold),
-        ),
+        title: Text('สรุปรายการสั่งซื้อ', 
+          style: GoogleFonts.prompt(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 0,
@@ -88,13 +87,8 @@ class _PurchaseOrderCartScreenState extends State<PurchaseOrderCartScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'หลักฐานใบเสร็จ / บิลสั่งซื้อ',
-            style: GoogleFonts.prompt(
-              fontWeight: FontWeight.w600,
-              fontSize: 16,
-            ),
-          ),
+          Text('หลักฐานใบเสร็จ / บิลสั่งซื้อ', 
+            style: GoogleFonts.prompt(fontWeight: FontWeight.w600, fontSize: 16)),
           const SizedBox(height: 12),
           GestureDetector(
             onTap: () => _showImageSourceSheet(),
@@ -104,10 +98,7 @@ class _PurchaseOrderCartScreenState extends State<PurchaseOrderCartScreen> {
               decoration: BoxDecoration(
                 color: Colors.grey[100],
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: Colors.grey[300]!,
-                  style: BorderStyle.solid,
-                ),
+                border: Border.all(color: Colors.grey[300]!, style: BorderStyle.solid),
               ),
               child: _billImage != null
                   ? ClipRRect(
@@ -117,69 +108,44 @@ class _PurchaseOrderCartScreenState extends State<PurchaseOrderCartScreen> {
                   : Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
-                          Icons.add_a_photo_outlined,
-                          size: 30,
-                          color: Colors.grey[400],
-                        ),
+                        Icon(Icons.add_a_photo_outlined, size: 30, color: Colors.grey[400]),
                         const SizedBox(height: 8),
-                        Text(
-                          'คลิกเพื่อเพิ่มรูปภาพบิล',
-                          style: GoogleFonts.prompt(
-                            color: Colors.grey[600],
-                            fontSize: 12,
-                          ),
-                        ),
+                        Text('คลิกเพื่อเพิ่มรูปภาพบิล', 
+                          style: GoogleFonts.prompt(color: Colors.grey[600], fontSize: 12)),
                       ],
                     ),
             ),
           ),
           const SizedBox(height: 20),
-          Text(
-            'วิธีการชำระเงิน',
-            style: GoogleFonts.prompt(
-              fontWeight: FontWeight.w600,
-              fontSize: 16,
-            ),
-          ),
+          Text('วิธีการชำระเงิน', 
+            style: GoogleFonts.prompt(fontWeight: FontWeight.w600, fontSize: 16)),
           const SizedBox(height: 8),
           Row(
             children: [
               Expanded(
                 child: ChoiceChip(
-                  label: Center(
-                    child: Text('เงินสด', style: GoogleFonts.prompt()),
-                  ),
+                  label: Center(child: Text('เงินสด', style: GoogleFonts.prompt())),
                   selected: _paymentMethod == 'Cash',
                   onSelected: (selected) {
                     if (selected) setState(() => _paymentMethod = 'Cash');
                   },
                   selectedColor: const Color(0xFF1E2736),
                   labelStyle: GoogleFonts.prompt(
-                    color: _paymentMethod == 'Cash'
-                        ? Colors.white
-                        : Colors.black,
+                    color: _paymentMethod == 'Cash' ? Colors.white : Colors.black
                   ),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: ChoiceChip(
-                  label: Center(
-                    child: Text(
-                      'ค้างชำระ (เครดิต)',
-                      style: GoogleFonts.prompt(),
-                    ),
-                  ),
+                  label: Center(child: Text('ค้างชำระ (เครดิต)', style: GoogleFonts.prompt())),
                   selected: _paymentMethod == 'Credit',
                   onSelected: (selected) {
                     if (selected) setState(() => _paymentMethod = 'Credit');
                   },
                   selectedColor: Colors.orange[800],
                   labelStyle: GoogleFonts.prompt(
-                    color: _paymentMethod == 'Credit'
-                        ? Colors.white
-                        : Colors.black,
+                    color: _paymentMethod == 'Credit' ? Colors.white : Colors.black
                   ),
                 ),
               ),
@@ -193,21 +159,14 @@ class _PurchaseOrderCartScreenState extends State<PurchaseOrderCartScreen> {
   void _showImageSourceSheet() {
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (ctx) => Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              'เลือกแหล่งที่มาของรูปภาพ',
-              style: GoogleFonts.prompt(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            Text('เลือกแหล่งที่มาของรูปภาพ', 
+              style: GoogleFonts.prompt(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 20),
             ListTile(
               leading: const Icon(Icons.camera_alt),
@@ -231,10 +190,7 @@ class _PurchaseOrderCartScreenState extends State<PurchaseOrderCartScreen> {
     );
   }
 
-  Widget _buildOrderItem(
-    PurchaseOrderItem item,
-    PurchaseOrderProvider provider,
-  ) {
+  Widget _buildOrderItem(PurchaseOrderItem item, PurchaseOrderProvider provider) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
@@ -242,34 +198,38 @@ class _PurchaseOrderCartScreenState extends State<PurchaseOrderCartScreen> {
         children: [
           // รูปสินค้า (เล็กๆ)
           Container(
-            width: 50,
-            height: 50,
+            width: 55,
+            height: 55,
             decoration: BoxDecoration(
-              color: Colors.grey[200],
-              borderRadius: BorderRadius.circular(8),
+              color: const Color.fromARGB(255, 226, 232, 240),
+              borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(Icons.image_outlined, color: Colors.grey),
+            child: item.product.imagePath != null
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: kIsWeb
+                        ? Image.network(item.product.imagePath!,
+                            key: ValueKey(item.product.imagePath!),
+                            fit: BoxFit.cover)
+                        : Image.file(File(item.product.imagePath!),
+                            key: ValueKey(item.product.imagePath!),
+                            fit: BoxFit.cover),
+                  )
+                : const Icon(Icons.image_outlined, color: Colors.grey),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  item.product.name,
-                  style: GoogleFonts.prompt(fontWeight: FontWeight.bold),
-                ),
-                Text(
-                  'สต็อกปัจจุบัน: ${item.product.stock}',
-                  style: GoogleFonts.prompt(fontSize: 12, color: Colors.grey),
-                ),
+                Text(item.product.name, 
+                  style: GoogleFonts.prompt(fontWeight: FontWeight.bold)),
+                Text('สต็อกปัจจุบัน: ${item.product.stock}', 
+                  style: GoogleFonts.prompt(fontSize: 12, color: Colors.grey)),
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    Text(
-                      'ทุนต่อหน่วย:',
-                      style: GoogleFonts.prompt(fontSize: 13),
-                    ),
+                    Text('ทุนต่อหน่วย:', style: GoogleFonts.prompt(fontSize: 13)),
                     const SizedBox(width: 8),
                     SizedBox(
                       width: 80,
@@ -278,18 +238,13 @@ class _PurchaseOrderCartScreenState extends State<PurchaseOrderCartScreen> {
                         keyboardType: TextInputType.number,
                         style: GoogleFonts.prompt(fontSize: 13),
                         decoration: InputDecoration(
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                           hintText: item.costPrice.toString(),
                         ),
                         onChanged: (v) {
                           final cost = double.tryParse(v);
-                          if (cost != null)
-                            provider.updateCostPrice(item.product.id, cost);
+                          if (cost != null) provider.updateCostPrice(item.product.id, cost);
                         },
                       ),
                     ),
@@ -307,23 +262,16 @@ class _PurchaseOrderCartScreenState extends State<PurchaseOrderCartScreen> {
                     icon: const Icon(Icons.remove_circle_outline, size: 20),
                     onPressed: () => provider.removeSingleItem(item.product.id),
                   ),
-                  Text(
-                    '${item.quantity}',
-                    style: GoogleFonts.prompt(fontWeight: FontWeight.bold),
-                  ),
+                  Text('${item.quantity}', 
+                    style: GoogleFonts.prompt(fontWeight: FontWeight.bold)),
                   IconButton(
                     icon: const Icon(Icons.add_circle_outline, size: 20),
                     onPressed: () => provider.addItem(item.product),
                   ),
                 ],
               ),
-              Text(
-                '฿${item.total.toStringAsFixed(2)}',
-                style: GoogleFonts.prompt(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.blue,
-                ),
-              ),
+              Text('฿${item.total.toStringAsFixed(2)}', 
+                style: GoogleFonts.prompt(fontWeight: FontWeight.bold, color: Colors.blue)),
             ],
           ),
         ],
@@ -339,7 +287,7 @@ class _PurchaseOrderCartScreenState extends State<PurchaseOrderCartScreen> {
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
+            blurRadius: 10, 
             offset: const Offset(0, -5),
           ),
         ],
@@ -350,14 +298,8 @@ class _PurchaseOrderCartScreenState extends State<PurchaseOrderCartScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('ยอดเงินลงทุนรวม', style: GoogleFonts.prompt(fontSize: 16)),
-              Text(
-                '฿${po.totalAmount.toStringAsFixed(2)}',
-                style: GoogleFonts.prompt(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.blue[700],
-                ),
-              ),
+              Text('฿${po.totalAmount.toStringAsFixed(2)}', 
+                style: GoogleFonts.prompt(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.blue[700])),
             ],
           ),
           const SizedBox(height: 16),
@@ -365,23 +307,13 @@ class _PurchaseOrderCartScreenState extends State<PurchaseOrderCartScreen> {
             width: double.infinity,
             height: 50,
             child: ElevatedButton(
-              onPressed: po.itemCount == 0
-                  ? null
-                  : () => _confirmPurchase(context, po),
+              onPressed: po.itemCount == 0 ? null : () => _confirmPurchase(context, po),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF1E2736),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
-              child: Text(
-                'ยืนยันการนำสินค้าเข้าสต็อก',
-                style: GoogleFonts.prompt(
-                  fontSize: 16,
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              child: Text('ยืนยันการนำสินค้าเข้าสต็อก', 
+                style: GoogleFonts.prompt(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold)),
             ),
           ),
         ],
@@ -390,54 +322,34 @@ class _PurchaseOrderCartScreenState extends State<PurchaseOrderCartScreen> {
   }
 
   void _confirmPurchase(BuildContext context, PurchaseOrderProvider po) async {
-    // โหลด ProductProvider เพื่ออัปเดตสต็อกจริง
-    final productProvider = Provider.of<ProductProvider>(
-      context,
-      listen: false,
-    );
+    final productProvider = Provider.of<ProductProvider>(context, listen: false);
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('ยืนยันการสั่งซื้อ', style: GoogleFonts.prompt()),
-        content: Text(
-          'ระบบจะทำการเพิ่มจำนวนสินค้าเข้าสต็อกตามรายการที่เลือก ยืนยันหรือไม่?',
-          style: GoogleFonts.prompt(),
-        ),
+        content: Text('ระบบจะทำการเพิ่มจำนวนสินค้าเข้าสต็อกตามรายการที่เลือก ยืนยันหรือไม่?', 
+          style: GoogleFonts.prompt()),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text('ยกเลิก', style: GoogleFonts.prompt()),
-          ),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('ยกเลิก', style: GoogleFonts.prompt())),
           TextButton(
             onPressed: () async {
-              // Loop เพิ่มสต็อกสินค้า
               for (var item in po.items.values) {
                 final currentProduct = item.product;
                 productProvider.updateProduct(
-                  currentProduct..stock = currentProduct.stock + item.quantity,
+                  currentProduct..stock = currentProduct.stock + item.quantity
                 );
               }
-
-              po.clear(); // ล้างตะกร้าสั่งซื้อ
-              Navigator.pop(ctx); // ปิด Dialog
-              Navigator.pop(context); // ปิดหน้าสรุป
-              Navigator.pop(context); // กลับหน้า Setting
+              po.clear();
+              Navigator.pop(ctx);
+              Navigator.pop(context);
+              Navigator.pop(context);
 
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    'นำสินค้าเข้าสต็อกสำเร็จ!',
-                    style: GoogleFonts.prompt(),
-                  ),
-                  backgroundColor: Colors.green,
-                ),
+                SnackBar(content: Text('นำสินค้าเข้าสต็อกสำเร็จ!', style: GoogleFonts.prompt()), backgroundColor: Colors.green),
               );
             },
-            child: Text(
-              'ยืนยัน',
-              style: GoogleFonts.prompt(fontWeight: FontWeight.bold),
-            ),
+            child: Text('ยืนยัน', style: GoogleFonts.prompt(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
