@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../models/product.dart';
+import '../services/database_service.dart';
 
 class PurchaseOrderItem {
   final Product product;
@@ -17,8 +18,10 @@ class PurchaseOrderItem {
 
 class PurchaseOrderProvider with ChangeNotifier {
   final Map<String, PurchaseOrderItem> _items = {};
+  List<Map<String, dynamic>> _purchaseHistory = [];
 
   Map<String, PurchaseOrderItem> get items => {..._items};
+  List<Map<String, dynamic>> get purchaseHistory => _purchaseHistory;
 
   int get itemCount => _items.length;
 
@@ -28,6 +31,28 @@ class PurchaseOrderProvider with ChangeNotifier {
       total += item.total;
     });
     return total;
+  }
+
+  PurchaseOrderProvider() {
+    loadPurchaseHistory();
+  }
+
+  Future<void> loadPurchaseHistory() async {
+    try {
+      _purchaseHistory = await DatabaseService.instance.getPurchaseOrders();
+      notifyListeners();
+    } catch (e) {
+      debugPrint("Error loading purchase history: $e");
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getPurchaseOrderDetails(String poId) async {
+    try {
+      return await DatabaseService.instance.getPurchaseOrderDetails(poId);
+    } catch (e) {
+      debugPrint("Error loading purchase details: $e");
+      return [];
+    }
   }
 
   void addItem(Product product) {
@@ -61,6 +86,13 @@ class PurchaseOrderProvider with ChangeNotifier {
   }
 
   void updateQuantity(String productId, int newQty) {
+    if (_items.containsKey(productId)) {
+      _items[productId]!.quantity = newQty;
+      notifyListeners();
+    }
+  }
+
+  void updateQuantityById(String productId, int newQty) {
     if (_items.containsKey(productId)) {
       _items[productId]!.quantity = newQty;
       notifyListeners();

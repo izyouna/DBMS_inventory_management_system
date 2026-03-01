@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
-import 'package:sqflite/sqlite_api.dart';
 
 class DatabaseService {
   static Database? _db;
@@ -29,6 +28,9 @@ class DatabaseService {
   final String _saleOrderTableName = "SaleOrder";
   final String _orderDetailTableName = "OrderDetail";
   final String _paymentTypeTableName = "PaymentType";
+  final String _purchaseOrderTableName = "PurchaseOrder";
+  final String _purchaseDetailTableName = "PurchaseDetail";
+  final String _purchaseTypeTableName = "PurchaseType";
 
   // Product Columns
   final String _productIdColumnName = "ProductID";
@@ -52,13 +54,26 @@ class DatabaseService {
   final String _orderStatusColumnName = "OrderStatus";
   final String _orderPaymentIdColumnName = "PaymentID";
 
-  // OrderDetail Columns
+  // OrderDetail / PurchaseDetail Columns
   final String _detailUnitPriceColumnName = "UnitPrice";
   final String _detailQuantityColumnName = "Quantity";
 
   // PaymentType Columns
   final String _paymentIdColumnName = "PaymentID";
   final String _paymentTypeNameColumnName = "TypeName";
+
+  // PurchaseOrder Columns
+  final String _poIdColumnName = "POID";
+  final String _poReceiveDateColumnName = "ReceiveDate";
+  final String _poTotalCostColumnName = "TotalCost";
+  final String _poBillImagePathColumnName = "BillImagePath";
+  final String _poStatusColumnName = "Status"; // Confirmed, Cancelled
+  final String _poPaymentStatusColumnName = "PaymentStatus"; // Paid, Pending
+  final String _poTypeIdColumnName = "PTID";
+
+  // PurchaseType Columns
+  final String _ptIdColumnName = "PTID";
+  final String _ptNameColumnName = "PTName";
 
   DatabaseService._constructor();
 
@@ -82,13 +97,16 @@ class DatabaseService {
     return await databaseFactory.openDatabase(
       databasePath,
       options: OpenDatabaseOptions(
-        version: 8,
+        version: 13,
         onCreate: (db, version) async {
           await _createTables(db);
           await _seedInitialData(db);
         },
         onUpgrade: (db, oldVersion, newVersion) async {
-          if (oldVersion < 8) {
+          if (oldVersion < 13) {
+            await db.execute("DROP TABLE IF EXISTS $_purchaseDetailTableName");
+            await db.execute("DROP TABLE IF EXISTS $_purchaseOrderTableName");
+            await db.execute("DROP TABLE IF EXISTS $_purchaseTypeTableName");
             await db.execute("DROP TABLE IF EXISTS $_orderDetailTableName");
             await db.execute("DROP TABLE IF EXISTS $_paymentTypeTableName");
             await db.execute("DROP TABLE IF EXISTS $_saleOrderTableName");
@@ -114,6 +132,13 @@ class DatabaseService {
       CREATE TABLE $_paymentTypeTableName(
         $_paymentIdColumnName TEXT PRIMARY KEY,
         $_paymentTypeNameColumnName TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE $_purchaseTypeTableName(
+        $_ptIdColumnName TEXT PRIMARY KEY,
+        $_ptNameColumnName TEXT NOT NULL
       )
     ''');
 
@@ -154,6 +179,31 @@ class DatabaseService {
         FOREIGN KEY ($_productIdColumnName) REFERENCES $_productTableName($_productIdColumnName)
       )
     ''');
+
+    await db.execute('''
+      CREATE TABLE $_purchaseOrderTableName(
+        $_poIdColumnName TEXT PRIMARY KEY,
+        $_poReceiveDateColumnName TEXT NOT NULL,
+        $_poTotalCostColumnName REAL NOT NULL,
+        $_poBillImagePathColumnName TEXT,
+        $_poStatusColumnName TEXT NOT NULL,
+        $_poPaymentStatusColumnName TEXT NOT NULL,
+        $_poTypeIdColumnName TEXT,
+        FOREIGN KEY ($_poTypeIdColumnName) REFERENCES $_purchaseTypeTableName($_ptIdColumnName)
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE $_purchaseDetailTableName(
+        $_poIdColumnName TEXT,
+        $_productIdColumnName TEXT,
+        $_detailUnitPriceColumnName REAL NOT NULL,
+        $_detailQuantityColumnName INTEGER NOT NULL,
+        PRIMARY KEY ($_poIdColumnName, $_productIdColumnName),
+        FOREIGN KEY ($_poIdColumnName) REFERENCES $_purchaseOrderTableName($_poIdColumnName),
+        FOREIGN KEY ($_productIdColumnName) REFERENCES $_productTableName($_productIdColumnName)
+      )
+    ''');
   }
 
   Future<void> _seedInitialData(Database db) async {
@@ -164,6 +214,9 @@ class DatabaseService {
     await db.insert(_paymentTypeTableName, {_paymentIdColumnName: 'PAY1', _paymentTypeNameColumnName: 'เงินสด'});
     await db.insert(_paymentTypeTableName, {_paymentIdColumnName: 'PAY2', _paymentTypeNameColumnName: 'QR Code / โอนเงิน'});
     await db.insert(_paymentTypeTableName, {_paymentIdColumnName: 'PAY3', _paymentTypeNameColumnName: 'ขายเชื่อ (ค้างชำระ)'});
+
+    await db.insert(_purchaseTypeTableName, {_ptIdColumnName: 'PT1', _ptNameColumnName: 'เงินสด'});
+    await db.insert(_purchaseTypeTableName, {_ptIdColumnName: 'PT2', _ptNameColumnName: 'ค้างชำระ (เครดิต)'});
   }
 
   Future<String> _generateCustomId(String tableName, String idColumn, String prefix) async {
@@ -462,6 +515,118 @@ class DatabaseService {
 
       return true;
     });
+  }
+
+  // --- PurchaseOrder Methods ---
+  Future<String> savePurchaseOrder({
+    required String receiveDate,
+    required double totalCost,
+    required List<Map<String, dynamic>> items,
+    String? billImagePath,
+    required String purchaseType,
+    required String paymentStatus,
+  }) async {
+    final poId = 'PO-${DateTime.now().millisecondsSinceEpoch}';
+
+    final db = await database;
+    if (db == null) return "";
+
+    return await db.transaction((txn) async {
+      final List<Map<String, dynamic>> ptTypes = await txn.query(
+        _purchaseTypeTableName,
+        where: '$_ptNameColumnName = ?',
+        whereArgs: [purchaseType],
+      );
+      String ptId = ptTypes.isNotEmpty ? ptTypes.first[_ptIdColumnName] : "PT1";
+
+      await txn.insert(_purchaseOrderTableName, {
+        _poIdColumnName: poId,
+        _poReceiveDateColumnName: receiveDate,
+        _poTotalCostColumnName: totalCost,
+        _poBillImagePathColumnName: billImagePath,
+        _poStatusColumnName: 'Confirmed', 
+        _poPaymentStatusColumnName: paymentStatus,
+        _poTypeIdColumnName: ptId,
+      });
+
+      for (var item in items) {
+        await txn.insert(_purchaseDetailTableName, {
+          _poIdColumnName: poId,
+          _productIdColumnName: item['ProductID'],
+          _detailUnitPriceColumnName: item['UnitPrice'],
+          _detailQuantityColumnName: item['Quantity'],
+        });
+        // เพิ่มสต็อกสินค้า
+        await txn.execute('''
+          UPDATE $_productTableName SET $_productTotalUnitColumnName = $_productTotalUnitColumnName + ? WHERE $_productIdColumnName = ?
+        ''', [item['Quantity'], item['ProductID']]);
+      }
+      return poId;
+    });
+  }
+
+  Future<bool> cancelPurchaseOrder(String poId) async {
+    final db = await database;
+    if (db == null) return false;
+
+    return await db.transaction((txn) async {
+      // 1. ตรวจสอบสถานะปัจจุบัน
+      final List<Map<String, dynamic>> po = await txn.query(
+        _purchaseOrderTableName,
+        where: '$_poIdColumnName = ? AND $_poStatusColumnName = ?',
+        whereArgs: [poId, 'Confirmed'],
+      );
+
+      if (po.isEmpty) return false;
+
+      // 2. อัปเดตสถานะเป็น Cancelled
+      await txn.update(
+        _purchaseOrderTableName,
+        {_poStatusColumnName: 'Cancelled'},
+        where: '$_poIdColumnName = ?',
+        whereArgs: [poId],
+      );
+
+      // 3. ดึงรายการสินค้าเพื่อนำไปหักสต็อกคืน
+      final List<Map<String, dynamic>> details = await txn.query(
+        _purchaseDetailTableName,
+        where: '$_poIdColumnName = ?',
+        whereArgs: [poId],
+      );
+
+      // 4. หักสต็อกคืน (Deduct)
+      for (var item in details) {
+        await txn.execute('''
+          UPDATE $_productTableName 
+          SET $_productTotalUnitColumnName = $_productTotalUnitColumnName - ? 
+          WHERE $_productIdColumnName = ?
+        ''', [item['Quantity'], item['ProductID']]);
+      }
+
+      return true;
+    });
+  }
+
+  Future<List<Map<String, dynamic>>> getPurchaseOrders() async {
+    final db = await database;
+    if (db == null) return [];
+    return await db.rawQuery('''
+      SELECT po.*, pt.$_ptNameColumnName
+      FROM $_purchaseOrderTableName po
+      LEFT JOIN $_purchaseTypeTableName pt ON po.$_poTypeIdColumnName = pt.$_ptIdColumnName
+      ORDER BY po.$_poReceiveDateColumnName DESC
+    ''');
+  }
+
+  Future<List<Map<String, dynamic>>> getPurchaseOrderDetails(String poId) async {
+    final db = await database;
+    if (db == null) return [];
+    return await db.rawQuery('''
+      SELECT d.*, p.$_productNameColumnName, p.$_productUnitColumnName
+      FROM $_purchaseDetailTableName d
+      JOIN $_productTableName p ON d.$_productIdColumnName = p.$_productIdColumnName
+      WHERE d.$_poIdColumnName = ?
+    ''', [poId]);
   }
 
   Future<void> printAllProducts() async {

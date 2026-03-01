@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../providers/purchase_order_provider.dart';
 import '../providers/product_provider.dart';
+import '../services/database_service.dart';
 
 class PurchaseOrderCartScreen extends StatefulWidget {
   const PurchaseOrderCartScreen({super.key});
@@ -192,14 +193,14 @@ class _PurchaseOrderCartScreenState extends State<PurchaseOrderCartScreen> {
 
   Widget _buildOrderItem(PurchaseOrderItem item, PurchaseOrderProvider provider) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // รูปสินค้า (เล็กๆ)
+          // รูปสินค้า
           Container(
-            width: 55,
-            height: 55,
+            width: 60,
+            height: 60,
             decoration: BoxDecoration(
               color: const Color.fromARGB(255, 226, 232, 240),
               borderRadius: BorderRadius.circular(10),
@@ -208,43 +209,65 @@ class _PurchaseOrderCartScreenState extends State<PurchaseOrderCartScreen> {
                 ? ClipRRect(
                     borderRadius: BorderRadius.circular(10),
                     child: kIsWeb
-                        ? Image.network(item.product.imagePath!,
-                            key: ValueKey(item.product.imagePath!),
-                            fit: BoxFit.cover)
-                        : Image.file(File(item.product.imagePath!),
-                            key: ValueKey(item.product.imagePath!),
-                            fit: BoxFit.cover),
+                        ? Image.network(item.product.imagePath!, fit: BoxFit.cover)
+                        : Image.file(File(item.product.imagePath!), fit: BoxFit.cover),
                   )
                 : const Icon(Icons.image_outlined, color: Colors.grey),
           ),
           const SizedBox(width: 12),
+          // ข้อมูลสินค้า
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(item.product.name, 
-                  style: GoogleFonts.prompt(fontWeight: FontWeight.bold)),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.prompt(fontWeight: FontWeight.bold, fontSize: 14)),
                 Text('สต็อกปัจจุบัน: ${item.product.stock}', 
                   style: GoogleFonts.prompt(fontSize: 12, color: Colors.grey)),
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    Text('ทุนต่อหน่วย:', style: GoogleFonts.prompt(fontSize: 13)),
-                    const SizedBox(width: 8),
+                    Text('ทุน:', style: GoogleFonts.prompt(fontSize: 12)),
+                    const SizedBox(width: 4),
                     SizedBox(
-                      width: 80,
-                      height: 35,
+                      width: 70,
+                      height: 30,
                       child: TextField(
                         keyboardType: TextInputType.number,
-                        style: GoogleFonts.prompt(fontSize: 13),
+                        style: GoogleFonts.prompt(fontSize: 12),
                         decoration: InputDecoration(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                          hintText: item.costPrice.toString(),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+                          hintText: item.costPrice.toStringAsFixed(0),
                         ),
                         onChanged: (v) {
                           final cost = double.tryParse(v);
                           if (cost != null) provider.updateCostPrice(item.product.id, cost);
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text('จำนวน:', style: GoogleFonts.prompt(fontSize: 12)),
+                    const SizedBox(width: 4),
+                    SizedBox(
+                      width: 50,
+                      height: 30,
+                      child: TextField(
+                        keyboardType: TextInputType.number,
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.prompt(fontSize: 12, fontWeight: FontWeight.bold),
+                        decoration: InputDecoration(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+                          hintText: item.quantity.toString(),
+                        ),
+                        onChanged: (v) {
+                          final qty = int.tryParse(v);
+                          if (qty != null && qty > 0) {
+                            provider.updateQuantity(item.product.id, qty);
+                          }
                         },
                       ),
                     ),
@@ -253,25 +276,20 @@ class _PurchaseOrderCartScreenState extends State<PurchaseOrderCartScreen> {
               ],
             ),
           ),
+          const SizedBox(width: 8),
+          // ยอดรวมและปุ่มลบ
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.remove_circle_outline, size: 20),
-                    onPressed: () => provider.removeSingleItem(item.product.id),
-                  ),
-                  Text('${item.quantity}', 
-                    style: GoogleFonts.prompt(fontWeight: FontWeight.bold)),
-                  IconButton(
-                    icon: const Icon(Icons.add_circle_outline, size: 20),
-                    onPressed: () => provider.addItem(item.product),
-                  ),
-                ],
+              IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                onPressed: () => provider.removeSingleItem(item.product.id),
               ),
+              const SizedBox(height: 8),
               Text('฿${item.total.toStringAsFixed(2)}', 
-                style: GoogleFonts.prompt(fontWeight: FontWeight.bold, color: Colors.blue)),
+                style: GoogleFonts.prompt(fontWeight: FontWeight.bold, color: Colors.blue, fontSize: 14)),
             ],
           ),
         ],
@@ -326,28 +344,64 @@ class _PurchaseOrderCartScreenState extends State<PurchaseOrderCartScreen> {
 
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         title: Text('ยืนยันการสั่งซื้อ', style: GoogleFonts.prompt()),
-        content: Text('ระบบจะทำการเพิ่มจำนวนสินค้าเข้าสต็อกตามรายการที่เลือก ยืนยันหรือไม่?', 
+        content: Text('ระบบจะทำการเพิ่มจำนวนสินค้าเข้าสต็อกและบันทึกข้อมูลการสั่งซื้อ ยืนยันหรือไม่?', 
           style: GoogleFonts.prompt()),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: Text('ยกเลิก', style: GoogleFonts.prompt())),
           TextButton(
             onPressed: () async {
-              for (var item in po.items.values) {
-                final currentProduct = item.product;
-                productProvider.updateProduct(
-                  currentProduct..stock = currentProduct.stock + item.quantity
+              final poProvider = Provider.of<PurchaseOrderProvider>(context, listen: false);
+              try {
+                // 1. เตรียมข้อมูลสำหรับบันทึกลงฐานข้อมูล
+                final List<Map<String, dynamic>> itemsToSave = po.items.values.map((item) {
+                  return {
+                    'ProductID': item.product.id,
+                    'UnitPrice': item.costPrice,
+                    'Quantity': item.quantity,
+                  };
+                }).toList();
+
+                // 2. บันทึกลงตาราง PurchaseOrder และ PurchaseDetail
+                // และอัปเดตสต็อกในฐานข้อมูล (จัดการใน DatabaseService.savePurchaseOrder)
+                await DatabaseService.instance.savePurchaseOrder(
+                  receiveDate: DateTime.now().toIso8601String(),
+                  totalCost: po.totalAmount,
+                  items: itemsToSave,
+                  billImagePath: _billImage?.path, // ส่งพาธรูปภาพบิล
+                  purchaseType: _paymentMethod == 'Cash' ? 'เงินสด' : 'ค้างชำระ (เครดิต)', // กำหนดประเภท
+                  paymentStatus: _paymentMethod == 'Cash' ? 'Paid' : 'Pending', // ส่งสถานะการชำระเงิน
+                );
+
+                // 3. รีโหลดข้อมูลสินค้าใน Provider เพื่อให้ UI อัปเดตสต็อกล่าสุด
+                await productProvider.loadProductsFromDatabase();
+                await poProvider.loadPurchaseHistory();
+
+                po.clear();
+                
+                if (!mounted) return;
+                Navigator.pop(ctx); // ปิด Dialog
+                Navigator.pop(context); // ออกจากหน้ารถเข็น
+                Navigator.pop(context); // ออกจากหน้าเลือกสินค้า
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('นำสินค้าเข้าสต็อกและบันทึกข้อมูลสำเร็จ!', style: GoogleFonts.prompt()), 
+                    backgroundColor: Colors.green
+                  ),
+                );
+              } catch (e) {
+                if (!mounted) return;
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('เกิดข้อผิดพลาด: $e', style: GoogleFonts.prompt()), 
+                    backgroundColor: Colors.red
+                  ),
                 );
               }
-              po.clear();
-              Navigator.pop(ctx);
-              Navigator.pop(context);
-              Navigator.pop(context);
-
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('นำสินค้าเข้าสต็อกสำเร็จ!', style: GoogleFonts.prompt()), backgroundColor: Colors.green),
-              );
             },
             child: Text('ยืนยัน', style: GoogleFonts.prompt(fontWeight: FontWeight.bold)),
           ),

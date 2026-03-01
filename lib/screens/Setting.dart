@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'PurchaseOrder.dart'; // เพิ่ม import
+import 'PurchaseOrder.dart';
+import 'PurchaseHistory.dart'; // เพิ่ม import
 
 class SettingScreen extends StatelessWidget {
   const SettingScreen({super.key});
@@ -11,6 +12,7 @@ class SettingScreen extends StatelessWidget {
       {'icon': Icons.storefront, 'title': 'ข้อมูร้านค้า'},
       {'icon': Icons.receipt_long, 'title': 'รูปแบบใบเสร็จ'},
       {'icon': Icons.inventory_2, 'title': 'ใบสั่งซื้อ'},
+      {'icon': Icons.history, 'title': 'ประวัติใบสั่งซื้อ'}, // เพิ่มเมนูใหม่
       {'icon': Icons.payments_outlined, 'title': 'ช่องทางการชำระเงิน'},
       {'icon': Icons.account_circle_outlined, 'title': 'ผู้ใช้งานระบบ'},
       {'icon': Icons.lock_outline, 'title': 'ความปลอดภัย'},
@@ -65,6 +67,13 @@ class SettingScreen extends StatelessWidget {
                     context,
                     MaterialPageRoute(
                       builder: (context) => const PurchaseOrderScreen(),
+                    ),
+                  );
+                } else if (item['title'] == 'ประวัติใบสั่งซื้อ') {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const PurchaseHistoryScreen(),
                     ),
                   );
                 }

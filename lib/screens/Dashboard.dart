@@ -5,6 +5,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import '../providers/product_provider.dart';
 import '../providers/cart_provider.dart';
+import '../providers/purchase_order_provider.dart'; // เพิ่ม import
 import '../widgets/summary_card.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -161,83 +162,123 @@ class PurchasesDashboardTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // ในอนาคตสามารถนำข้อมูลจากฐานข้อมูลใบสั่งซื้อมาแสดงได้
-    // ตอนนี้ใช้ตัวเลขสมมติเพื่อให้เห็นดีไซน์
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          GridView.count(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisCount: 2,
-            mainAxisSpacing: 10,
-            crossAxisSpacing: 10,
-            padding: const EdgeInsets.all(16),
-            childAspectRatio: 1.25,
-            children: [
-              SummaryCard(
-                title: 'งบลงทุนวันนี้',
-                value: '฿0',
-                icon: Icons.shopping_cart_checkout,
-                backgroundColor: const Color.fromARGB(255, 230, 245, 255),
-                iconColor: Colors.blue,
-              ),
-              SummaryCard(
-                title: 'งบลงทุนเดือนนี้',
-                value: '฿0',
-                icon: Icons.account_balance_wallet_outlined,
-                backgroundColor: const Color.fromARGB(255, 240, 230, 255),
-                iconColor: Colors.purple,
-              ),
-              SummaryCard(
-                title: 'ยอดค้างชำระ',
-                value: '฿0',
-                icon: Icons.assignment_late_outlined,
-                backgroundColor: const Color.fromARGB(255, 255, 245, 230),
-                iconColor: Colors.orange,
-              ),
-              SummaryCard(
-                title: 'จำนวนบิลสั่งซื้อ',
-                value: '0',
-                icon: Icons.receipt_long,
-                backgroundColor: const Color.fromARGB(255, 240, 240, 240),
-                iconColor: Colors.grey[700]!,
-              ),
-            ],
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Column(
-                children: [
-                  Icon(
-                    Icons.inventory_2_outlined,
-                    size: 60,
-                    color: Colors.grey[300],
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'ยังไม่มีข้อมูลการจัดซื้อ',
-                    style: GoogleFonts.prompt(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Text(
-                    'ข้อมูลจะปรากฏที่นี่เมื่อมีการทำรายการใบสั่งซื้อ',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.prompt(color: Colors.grey),
-                  ),
-                ],
-              ),
+    final poProvider = Provider.of<PurchaseOrderProvider>(context);
+    final history = poProvider.purchaseHistory;
+    final now = DateTime.now();
+
+    // กรองเฉพาะบิลที่ยืนยันแล้ว (Confirmed)
+    final confirmedPOs = history.where((po) => po['Status'] == 'Confirmed').toList();
+
+    // คำนวณสถิติต่างๆ
+    final todayInvestment = confirmedPOs.where((po) {
+      final date = DateTime.parse(po['ReceiveDate']);
+      return date.day == now.day && date.month == now.month && date.year == now.year;
+    }).fold(0.0, (sum, po) => sum + (po['TotalCost'] as num).toDouble());
+
+    final monthInvestment = confirmedPOs.where((po) {
+      final date = DateTime.parse(po['ReceiveDate']);
+      return date.month == now.month && date.year == now.year;
+    }).fold(0.0, (sum, po) => sum + (po['TotalCost'] as num).toDouble());
+
+    final totalPending = confirmedPOs.where((po) => po['PaymentStatus'] == 'Pending')
+        .fold(0.0, (sum, po) => sum + (po['TotalCost'] as num).toDouble());
+
+    final totalBills = confirmedPOs.length;
+
+    // ข้อมูลสำหรับกราฟ 7 วันล่าสุด
+    final List<BarChartGroupData> barGroups = [];
+    final List<String> days = [];
+    for (int i = 6; i >= 0; i--) {
+      final date = now.subtract(Duration(days: i));
+      days.add(DateFormat('E').format(date));
+      final dailyTotal = confirmedPOs.where((po) {
+        final d = DateTime.parse(po['ReceiveDate']);
+        return d.day == date.day && d.month == date.month && d.year == date.year;
+      }).fold(0.0, (sum, po) => sum + (po['TotalCost'] as num).toDouble());
+
+      barGroups.add(
+        BarChartGroupData(
+          x: 6 - i,
+          barRods: [
+            BarChartRodData(
+              toY: dailyTotal,
+              color: Colors.blue[700]!,
+              width: 16,
             ),
-          ),
-        ],
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: () => poProvider.loadPurchaseHistory(),
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: Column(
+          children: [
+            GridView.count(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisCount: 2,
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              padding: const EdgeInsets.all(16),
+              childAspectRatio: 1.25,
+              children: [
+                SummaryCard(
+                  title: 'งบลงทุนวันนี้',
+                  value: '฿${todayInvestment.toStringAsFixed(0)}',
+                  icon: Icons.shopping_cart_checkout,
+                  backgroundColor: const Color.fromARGB(255, 230, 245, 255),
+                  iconColor: Colors.blue,
+                ),
+                SummaryCard(
+                  title: 'งบลงทุนเดือนนี้',
+                  value: '฿${monthInvestment.toStringAsFixed(0)}',
+                  icon: Icons.account_balance_wallet_outlined,
+                  backgroundColor: const Color.fromARGB(255, 240, 230, 255),
+                  iconColor: Colors.purple,
+                ),
+                SummaryCard(
+                  title: 'ยอดค้างชำระ',
+                  value: '฿${totalPending.toStringAsFixed(0)}',
+                  icon: Icons.assignment_late_outlined,
+                  backgroundColor: const Color.fromARGB(255, 255, 245, 230),
+                  iconColor: Colors.orange,
+                ),
+                SummaryCard(
+                  title: 'จำนวนบิลสั่งซื้อ',
+                  value: totalBills.toString(),
+                  icon: Icons.receipt_long,
+                  backgroundColor: const Color.fromARGB(255, 240, 240, 240),
+                  iconColor: Colors.grey[700]!,
+                ),
+              ],
+            ),
+            if (confirmedPOs.isEmpty)
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(40),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Column(
+                    children: [
+                      Icon(Icons.inventory_2_outlined, size: 60, color: Colors.grey[200]),
+                      const SizedBox(height: 16),
+                      Text('ยังไม่มีข้อมูลการจัดซื้อ', 
+                        style: GoogleFonts.prompt(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.grey)),
+                    ],
+                  ),
+                ),
+              )
+            else
+              _buildChartSection('งบลงทุน 7 วันล่าสุด', barGroups, days),
+          ],
+        ),
       ),
     );
   }
