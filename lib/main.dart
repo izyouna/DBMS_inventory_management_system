@@ -9,6 +9,7 @@ import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 
 import 'providers/product_provider.dart';
 import 'providers/cart_provider.dart';
+import 'providers/purchase_order_provider.dart'; // เพิ่ม import
 import 'services/database_service.dart';
 // import 'screens/AddProduct.dart';
 import 'screens/Dashboard.dart';
@@ -45,6 +46,7 @@ void main() async {
       providers: [
         ChangeNotifierProvider(create: (_) => ProductProvider()),
         ChangeNotifierProvider(create: (_) => CartProvider()),
+        ChangeNotifierProvider(create: (_) => PurchaseOrderProvider()),
       ],
       child: const InventoryApp(),
     ),
@@ -179,7 +181,7 @@ class _MainNavScreenState extends State<MainNavScreen> {
                 ),
                 child: const Icon(Icons.history_edu_outlined),
               ),
-              label: 'ลูกหนี้',
+              label: 'ค้างชำระ',
             ),
             BottomNavigationBarItem(
               icon: const Icon(Icons.auto_graph_outlined),
