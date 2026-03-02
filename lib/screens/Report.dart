@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -36,7 +37,6 @@ class _ReportScreenState extends State<ReportScreen> {
     final todaySales = todayOrders.fold(0.0, (sum, o) => sum + o.totalAmount);
     final monthSales = monthOrders.fold(0.0, (sum, o) => sum + o.totalAmount);
     
-    // คำนวณยอดค้างชำระเฉพาะบิลที่ยังไม่ถูกยกเลิก
     final unpaidTotal = cartProvider.unpaidOrders
         .where((o) => o.orderStatus == 'Confirmed')
         .fold(0.0, (sum, o) => sum + o.totalAmount);
@@ -230,12 +230,11 @@ class _ReportScreenState extends State<ReportScreen> {
           ),
           TextButton(
             onPressed: () async {
-              Navigator.pop(ctx); // ปิด Dialog ยืนยัน
+              Navigator.pop(ctx); 
               
               final cartProvider = Provider.of<CartProvider>(context, listen: false);
               final productProvider = Provider.of<ProductProvider>(context, listen: false);
               
-              // แสดง Loading
               showDialog(
                 context: context,
                 barrierDismissible: false,
@@ -245,12 +244,10 @@ class _ReportScreenState extends State<ReportScreen> {
               final success = await cartProvider.cancelOrder(order.id);
               
               if (context.mounted) {
-                Navigator.pop(context); // ปิด Loading
+                Navigator.pop(context); 
                 
                 if (success) {
-                  // รีโหลดสต็อกในหน้าสินค้าด้วย
                   await productProvider.loadProductsFromDatabase();
-                  
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('ยกเลิกบิลและคืนสต็อกสำเร็จ', style: GoogleFonts.prompt()), backgroundColor: Colors.green),
                   );
@@ -271,18 +268,27 @@ class _ReportScreenState extends State<ReportScreen> {
   void _showOrderDetails(BuildContext context, Order order) async {
     final cartProvider = Provider.of<CartProvider>(context, listen: false);
     
-    // แสดงตัวโหลดขณะดึงข้อมูล
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => const Center(child: CircularProgressIndicator()),
     );
 
-    // ดึงรายการสินค้าจริงจาก Database
     final items = await cartProvider.getOrderItemsFromDb(order.id);
     
+    List<Map<String, dynamic>> paymentHistory = [];
+    Map<String, dynamic>? debtInfo;
+    
+    final allDebtRecords = cartProvider.debtRecords;
+    final debtRecord = allDebtRecords.where((d) => d['OrderID'] == order.id).toList();
+    
+    if (debtRecord.isNotEmpty) {
+      debtInfo = debtRecord.first;
+      paymentHistory = await cartProvider.getDebtPaymentHistory(debtInfo!['DebtID']);
+    }
+    
     if (!context.mounted) return;
-    Navigator.pop(context); // ปิดตัวโหลด
+    Navigator.pop(context);
 
     showDialog(
       context: context,
@@ -297,19 +303,22 @@ class _ReportScreenState extends State<ReportScreen> {
         ),
         content: SizedBox(
           width: double.maxFinite,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Divider(),
-              if (items.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Text('ไม่พบรายการสินค้า', style: GoogleFonts.prompt(color: Colors.grey)),
-                )
-              else
-                Flexible(
-                  child: ListView.builder(
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Divider(),
+                Text('รายการสินค้า', style: GoogleFonts.prompt(fontWeight: FontWeight.bold, fontSize: 14)),
+                if (items.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Text('ไม่พบรายการสินค้า', style: GoogleFonts.prompt(color: Colors.grey)),
+                  )
+                else
+                  ListView.builder(
                     shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
                     itemCount: items.length,
                     itemBuilder: (context, index) {
                       final item = items[index];
@@ -342,26 +351,75 @@ class _ReportScreenState extends State<ReportScreen> {
                       );
                     },
                   ),
+                
+                if (paymentHistory.isNotEmpty) ...[
+                  const Divider(),
+                  Text('ประวัติการรับชำระหนี้', 
+                    style: GoogleFonts.prompt(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.green[800])),
+                  const SizedBox(height: 8),
+                  ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: paymentHistory.length,
+                    itemBuilder: (ctx, i) {
+                      final pay = paymentHistory[i];
+                      final payDate = DateTime.parse(pay['PaidDate']);
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4.0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('฿${(pay['AmountPaid'] as num).toStringAsFixed(2)}', 
+                                  style: GoogleFonts.prompt(fontSize: 13, fontWeight: FontWeight.bold)),
+                                Text(payDate.toString().split('.')[0], 
+                                  style: GoogleFonts.prompt(fontSize: 11, color: Colors.grey)),
+                              ],
+                            ),
+                            if (pay['DeptPaidImagePath'] != null)
+                              IconButton(
+                                icon: const Icon(Icons.image_outlined, size: 20, color: Colors.blue),
+                                onPressed: () => _showFullScreenImage(context, pay['DeptPaidImagePath']),
+                              ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ],
+
+                const Divider(),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('ยอดรวมทั้งสิ้น', style: GoogleFonts.prompt(fontWeight: FontWeight.bold, fontSize: 16)),
+                    Text('฿${order.totalAmount.toStringAsFixed(2)}', 
+                      style: GoogleFonts.prompt(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.blue)),
+                  ],
                 ),
-              const Divider(),
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('ยอดรวมทั้งสิ้น', style: GoogleFonts.prompt(fontWeight: FontWeight.bold, fontSize: 16)),
-                  Text('฿${order.totalAmount.toStringAsFixed(2)}', 
-                    style: GoogleFonts.prompt(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.blue)),
+                if (debtInfo != null) ...[
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('ยอดคงเหลือที่ต้องจ่าย', style: GoogleFonts.prompt(fontSize: 14, color: Colors.red)),
+                      Text('฿${(debtInfo['RemainingAmount'] as num).toStringAsFixed(2)}', 
+                        style: GoogleFonts.prompt(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.red)),
+                    ],
+                  ),
                 ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('การชำระเงิน', style: GoogleFonts.prompt(fontSize: 14)),
-                  Text(order.paymentMethod, style: GoogleFonts.prompt(fontSize: 14, color: Colors.blueGrey)),
-                ],
-              ),
-            ],
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('การชำระเงิน', style: GoogleFonts.prompt(fontSize: 14)),
+                    Text(order.paymentMethod, style: GoogleFonts.prompt(fontSize: 14, color: Colors.blueGrey)),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
         actions: [
@@ -370,6 +428,32 @@ class _ReportScreenState extends State<ReportScreen> {
             child: Text('ปิด', style: GoogleFonts.prompt(fontWeight: FontWeight.bold)),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showFullScreenImage(BuildContext context, String imagePath) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            InteractiveViewer(child: Image.file(File(imagePath))),
+            Positioned(
+              top: 0, 
+              right: 0, 
+              child: CircleAvatar(
+                backgroundColor: Colors.black54,
+                child: IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white), 
+                  onPressed: () => Navigator.pop(ctx)
+                )
+              )
+            ),
+          ],
+        ),
       ),
     );
   }

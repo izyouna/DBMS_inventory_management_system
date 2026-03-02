@@ -32,6 +32,8 @@ class DatabaseService {
   final String _purchaseDetailTableName = "PurchaseDetail";
   final String _purchaseTypeTableName = "PurchaseType";
   final String _creditPaymentHistoryTableName = "CreditPaymentHistory";
+  final String _debtRecordTableName = "DebtRecord";
+  final String _debtPaymentHistoryTableName = "DeptPaymentHistory"; // ตารางประวัติการชำระหนี้ (ลูกหนี้)
 
   // Product Columns
   final String _productIdColumnName = "ProductID";
@@ -77,11 +79,27 @@ class DatabaseService {
   final String _ptIdColumnName = "PTID";
   final String _ptNameColumnName = "PTName";
 
-  // CreditPaymentHistory Columns
+  // CreditPaymentHistory Columns (เจ้าหนี้)
   final String _cphIdColumnName = "PaymentID";
   final String _cphAmountPaidColumnName = "AmountPaid";
   final String _cphPaidDateColumnName = "PaidDate";
   final String _cphPaidImagePathColumnName = "PaidImagePath";
+
+  // DebtRecord Columns
+  final String _debtIdColumnName = "DebtID";
+  final String _debtStatusColumnName = "DeptStatus"; 
+  final String _debtRecordStatusColumnName = "DeptRecordStatus"; 
+  final String _debtOriginalAmountColumnName = "OriginalAmount";
+  final String _debtRemainingAmountColumnName = "RemainingAmount";
+  final String _debtStartDateColumnName = "StartDate";
+  final String _debtCustomerNameColumnName = "CustomerName";
+  final String _debtPhoneColumnName = "Phone";
+
+  // DeptPaymentHistory Columns (ลูกหนี้ - เพิ่มใหม่)
+  final String _dphIdColumnName = "DeptPaymentID";
+  final String _dphAmountPaidColumnName = "AmountPaid";
+  final String _dphPaidDateColumnName = "PaidDate";
+  final String _dphPaidImagePathColumnName = "DeptPaidImagePath";
 
   DatabaseService._constructor();
 
@@ -105,13 +123,15 @@ class DatabaseService {
     return await databaseFactory.openDatabase(
       databasePath,
       options: OpenDatabaseOptions(
-        version: 14,
+        version: 17, // อัปเกรดเป็น 17
         onCreate: (db, version) async {
           await _createTables(db);
           await _seedInitialData(db);
         },
         onUpgrade: (db, oldVersion, newVersion) async {
-          if (oldVersion < 14) {
+          if (oldVersion < 17) {
+            await db.execute("DROP TABLE IF EXISTS $_debtPaymentHistoryTableName");
+            await db.execute("DROP TABLE IF EXISTS $_debtRecordTableName");
             await db.execute("DROP TABLE IF EXISTS $_creditPaymentHistoryTableName");
             await db.execute("DROP TABLE IF EXISTS $_purchaseDetailTableName");
             await db.execute("DROP TABLE IF EXISTS $_purchaseOrderTableName");
@@ -223,6 +243,32 @@ class DatabaseService {
         $_cphPaidDateColumnName TEXT NOT NULL,
         $_cphPaidImagePathColumnName TEXT,
         FOREIGN KEY ($_poIdColumnName) REFERENCES $_purchaseOrderTableName($_poIdColumnName)
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE $_debtRecordTableName(
+        $_debtIdColumnName TEXT PRIMARY KEY,
+        $_orderIdColumnName TEXT NOT NULL,
+        $_debtStatusColumnName TEXT NOT NULL,
+        $_debtRecordStatusColumnName TEXT NOT NULL,
+        $_debtOriginalAmountColumnName REAL NOT NULL,
+        $_debtRemainingAmountColumnName REAL NOT NULL,
+        $_debtStartDateColumnName TEXT NOT NULL,
+        $_debtCustomerNameColumnName TEXT,
+        $_debtPhoneColumnName TEXT,
+        FOREIGN KEY ($_orderIdColumnName) REFERENCES $_saleOrderTableName($_orderIdColumnName)
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE $_debtPaymentHistoryTableName(
+        $_dphIdColumnName INTEGER PRIMARY KEY AUTOINCREMENT,
+        $_debtIdColumnName TEXT NOT NULL,
+        $_dphAmountPaidColumnName REAL NOT NULL,
+        $_dphPaidDateColumnName TEXT NOT NULL,
+        $_dphPaidImagePathColumnName TEXT,
+        FOREIGN KEY ($_debtIdColumnName) REFERENCES $_debtRecordTableName($_debtIdColumnName)
       )
     ''');
   }
@@ -382,6 +428,8 @@ class DatabaseService {
     required String paymentStatus, 
     required String paymentType, 
     required List<Map<String, dynamic>> items,
+    String? customerName,
+    String? phone,
   }) async {
     final orderId = 'ORD-${DateTime.now().millisecondsSinceEpoch}';
 
@@ -440,6 +488,23 @@ class DatabaseService {
           UPDATE $_productTableName SET $_productTotalUnitColumnName = $_productTotalUnitColumnName - ? WHERE $_productIdColumnName = ?
         ''', [item['Quantity'], item['ProductID']]);
       }
+
+      // บันทึกลูกหนี้ ถ้าเป็น "ค้างชำระ"
+      if (paymentStatus == 'ค้างชำระ') {
+        final debtId = 'DBT-${DateTime.now().millisecondsSinceEpoch}';
+        await txn.insert(_debtRecordTableName, {
+          _debtIdColumnName: debtId,
+          _orderIdColumnName: orderId,
+          _debtStatusColumnName: 'Pending',
+          _debtRecordStatusColumnName: 'Confirmed',
+          _debtOriginalAmountColumnName: totalAmount, 
+          _debtRemainingAmountColumnName: totalAmount, 
+          _debtStartDateColumnName: date,
+          _debtCustomerNameColumnName: customerName,
+          _debtPhoneColumnName: phone,
+        });
+      }
+
       return orderId;
     });
   }
@@ -484,7 +549,6 @@ class DatabaseService {
       final index = _webSaleOrderDb.indexWhere((o) => o['OrderID'] == orderId);
       if (index != -1 && _webSaleOrderDb[index]['OrderStatus'] == 'Confirmed') {
         _webSaleOrderDb[index]['OrderStatus'] = 'Cancelled';
-        // คืนสต็อกใน Web Memory
         final details = _webOrderDetailDb.where((d) => d['OrderID'] == orderId);
         for (var d in details) {
           final pIndex = _webMemoryDb.indexWhere((p) => p['ProductID'] == d['ProductID']);
@@ -501,7 +565,6 @@ class DatabaseService {
     if (db == null) return false;
 
     return await db.transaction((txn) async {
-      // 1. ตรวจสอบสถานะปัจจุบันก่อน
       final List<Map<String, dynamic>> order = await txn.query(
         _saleOrderTableName,
         where: '$_orderIdColumnName = ? AND $_orderStatusColumnName = ?',
@@ -510,7 +573,6 @@ class DatabaseService {
 
       if (order.isEmpty) return false;
 
-      // 2. อัปเดตสถานะบิลเป็น Cancelled
       await txn.update(
         _saleOrderTableName,
         {_orderStatusColumnName: 'Cancelled'},
@@ -518,14 +580,20 @@ class DatabaseService {
         whereArgs: [orderId],
       );
 
-      // 3. ดึงรายการสินค้าเพื่อนำไปคืนสต็อก
+      // อัปเดตสถานะใน DebtRecord เป็น Cancelled ด้วย (ถ้ามี)
+      await txn.update(
+        _debtRecordTableName,
+        {_debtRecordStatusColumnName: 'Cancelled'},
+        where: '$_orderIdColumnName = ?',
+        whereArgs: [orderId],
+      );
+
       final List<Map<String, dynamic>> details = await txn.query(
         _orderDetailTableName,
         where: '$_orderIdColumnName = ?',
         whereArgs: [orderId],
       );
 
-      // 4. คืนสต็อกสินค้าแต่ละรายการ
       for (var item in details) {
         await txn.execute('''
           UPDATE $_productTableName 
@@ -564,7 +632,7 @@ class DatabaseService {
         _poIdColumnName: poId,
         _poReceiveDateColumnName: receiveDate,
         _poTotalCostColumnName: totalCost,
-        _poPaidAmountColumnName: paymentStatus == 'Paid' ? totalCost : 0, // ถ้าจ่ายสดให้ยอดจ่ายครบเลย
+        _poPaidAmountColumnName: paymentStatus == 'Paid' ? totalCost : 0, 
         _poBillImagePathColumnName: billImagePath,
         _poStatusColumnName: 'Confirmed', 
         _poPaymentStatusColumnName: paymentStatus,
@@ -578,7 +646,6 @@ class DatabaseService {
           _detailUnitPriceColumnName: item['UnitPrice'],
           _detailQuantityColumnName: item['Quantity'],
         });
-        // เพิ่มสต็อกสินค้า
         await txn.execute('''
           UPDATE $_productTableName SET $_productTotalUnitColumnName = $_productTotalUnitColumnName + ? WHERE $_productIdColumnName = ?
         ''', [item['Quantity'], item['ProductID']]);
@@ -592,7 +659,6 @@ class DatabaseService {
     if (db == null) return false;
 
     return await db.transaction((txn) async {
-      // 1. ตรวจสอบสถานะปัจจุบัน
       final List<Map<String, dynamic>> po = await txn.query(
         _purchaseOrderTableName,
         where: '$_poIdColumnName = ? AND $_poStatusColumnName = ?',
@@ -601,7 +667,6 @@ class DatabaseService {
 
       if (po.isEmpty) return false;
 
-      // 2. อัปเดตสถานะเป็น Cancelled
       await txn.update(
         _purchaseOrderTableName,
         {_poStatusColumnName: 'Cancelled'},
@@ -609,14 +674,12 @@ class DatabaseService {
         whereArgs: [poId],
       );
 
-      // 3. ดึงรายการสินค้าเพื่อนำไปหักสต็อกคืน
       final List<Map<String, dynamic>> details = await txn.query(
         _purchaseDetailTableName,
         where: '$_poIdColumnName = ?',
         whereArgs: [poId],
       );
 
-      // 4. หักสต็อกคืน (Deduct)
       for (var item in details) {
         await txn.execute('''
           UPDATE $_productTableName 
@@ -701,7 +764,7 @@ class DatabaseService {
     return await db.query(
       _creditPaymentHistoryTableName,
       where: '$_poIdColumnName = ?',
-      whereArgs: [poId], // เพิ่มพารามิเตอร์ที่ขาดไป
+      whereArgs: [poId],
       orderBy: '$_cphPaidDateColumnName DESC',
     );
   }
@@ -715,6 +778,87 @@ class DatabaseService {
       LEFT JOIN $_purchaseTypeTableName pt ON po.$_poTypeIdColumnName = pt.$_ptIdColumnName
       ORDER BY po.$_poReceiveDateColumnName DESC
     ''');
+  }
+
+  // --- DebtRecord & DebtPaymentHistory Methods (ลูกหนี้) ---
+  Future<List<Map<String, dynamic>>> getDebtRecords() async {
+    final db = await database;
+    if (db == null) return [];
+    return await db.query(
+      _debtRecordTableName,
+      where: '$_debtRecordStatusColumnName = ?',
+      whereArgs: ['Confirmed'],
+      orderBy: '$_debtStartDateColumnName DESC',
+    );
+  }
+
+  Future<bool> addDebtPayment({
+    required String debtId,
+    required double amount,
+    String? imagePath,
+  }) async {
+    final db = await database;
+    if (db == null) return false;
+
+    return await db.transaction((txn) async {
+      // 1. ตรวจสอบข้อมูลลูกหนี้
+      final List<Map<String, dynamic>> debtResults = await txn.query(
+        _debtRecordTableName,
+        where: '$_debtIdColumnName = ?',
+        whereArgs: [debtId],
+      );
+      if (debtResults.isEmpty) return false;
+      final debt = debtResults.first;
+
+      // 2. บันทึกลงตาราง DeptPaymentHistory
+      await txn.insert(_debtPaymentHistoryTableName, {
+        _debtIdColumnName: debtId,
+        _dphAmountPaidColumnName: amount,
+        _dphPaidDateColumnName: DateTime.now().toIso8601String(),
+        _dphPaidImagePathColumnName: imagePath,
+      });
+
+      // 3. อัปเดตยอดคงเหลือใน DebtRecord
+      final double currentRemaining = (debt[_debtRemainingAmountColumnName] as num).toDouble();
+      final double newRemaining = currentRemaining - amount;
+
+      final Map<String, dynamic> updateData = {
+        _debtRemainingAmountColumnName: newRemaining < 0 ? 0 : newRemaining,
+      };
+
+      // 4. ถ้าจ่ายครบ (หรือเกิน) ให้เปลี่ยน DeptStatus เป็น Paid
+      if (newRemaining <= 0) {
+        updateData[_debtStatusColumnName] = 'Paid';
+        
+        // อัปเดตสถานะใน SaleOrder หลักด้วย
+        await txn.update(
+          _saleOrderTableName,
+          {_orderPaymentStatusColumnName: 'ชำระแล้ว'},
+          where: '$_orderIdColumnName = ?',
+          whereArgs: [debt[_orderIdColumnName]],
+        );
+      }
+
+      await txn.update(
+        _debtRecordTableName,
+        updateData,
+        where: '$_debtIdColumnName = ?',
+        whereArgs: [debtId],
+      );
+
+      return true;
+    });
+  }
+
+  Future<List<Map<String, dynamic>>> getDebtPaymentHistory(String debtId) async {
+    final db = await database;
+    if (db == null) return [];
+    return await db.query(
+      _debtPaymentHistoryTableName,
+      where: '$_debtIdColumnName = ?',
+      whereArgs: [debtId],
+      orderBy: '$_dphPaidDateColumnName DESC',
+    );
   }
 
   Future<List<Map<String, dynamic>>> getPurchaseOrderDetails(String poId) async {

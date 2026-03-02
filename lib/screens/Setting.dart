@@ -9,7 +9,7 @@ class SettingScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = [
-      {'icon': Icons.storefront, 'title': 'ข้อมูร้านค้า'},
+      {'icon': Icons.storefront, 'title': 'ข้อมูลร้านค้า'},
       {'icon': Icons.receipt_long, 'title': 'รูปแบบใบเสร็จ'},
       {'icon': Icons.inventory_2, 'title': 'ใบสั่งซื้อ'},
       {'icon': Icons.history, 'title': 'ประวัติใบสั่งซื้อ'}, // เพิ่มเมนูใหม่
