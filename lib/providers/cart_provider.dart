@@ -8,9 +8,11 @@ import '../services/database_service.dart';
 class CartProvider with ChangeNotifier {
   final Map<String, CartItem> _items = {};
   List<Order> _orders = [];
+  List<Map<String, dynamic>> _debtRecords = [];
 
   Map<String, CartItem> get items => {..._items};
   List<Order> get orders => [..._orders];
+  List<Map<String, dynamic>> get debtRecords => [..._debtRecords];
 
   List<Order> get unpaidOrders => _orders.where((o) => !o.isPaid).toList();
 
@@ -26,6 +28,16 @@ class CartProvider with ChangeNotifier {
 
   CartProvider() {
     loadOrdersFromDatabase();
+    loadDebtRecords();
+  }
+
+  Future<void> loadDebtRecords() async {
+    try {
+      _debtRecords = await DatabaseService.instance.getDebtRecords();
+      notifyListeners();
+    } catch (e) {
+      debugPrint("Error loading debt records: $e");
+    }
   }
 
   // 1. โหลดเฉพาะหัวบิล (Header) จาก Database (ล่าสุดขึ้นก่อนเพราะ SQL ใช้ DESC)
@@ -94,10 +106,13 @@ class CartProvider with ChangeNotifier {
       paymentStatus: method is CreditPayment ? 'ค้างชำระ' : 'ชำระแล้ว',
       paymentType: paymentType,
       items: dbItems,
+      customerName: customer?.name,
+      phone: customer?.phone,
     );
 
-    // 2. รีโหลดประวัติบิลจาก Database ทันทีเพื่อให้รายการล่าสุดมาเป็นรายการแรก
+    // 2. รีโหลดประวัติบิลและลูกหนี้จาก Database
     await loadOrdersFromDatabase();
+    await loadDebtRecords();
     
     final completedOrder = _orders.firstWhere((o) => o.id == orderId);
     clearCart();
@@ -134,11 +149,34 @@ class CartProvider with ChangeNotifier {
     }
   }
 
+  // เพิ่มระบบจ่ายหนี้รายครั้ง (ลูกหนี้)
+  Future<bool> addDebtPayment({
+    required String debtId,
+    required double amount,
+    String? imagePath,
+  }) async {
+    final success = await DatabaseService.instance.addDebtPayment(
+      debtId: debtId,
+      amount: amount,
+      imagePath: imagePath,
+    );
+    if (success) {
+      await loadDebtRecords();
+      await loadOrdersFromDatabase();
+    }
+    return success;
+  }
+
+  Future<List<Map<String, dynamic>>> getDebtPaymentHistory(String debtId) async {
+    return await DatabaseService.instance.getDebtPaymentHistory(debtId);
+  }
+
   Future<bool> cancelOrder(String orderId) async {
     try {
       final success = await DatabaseService.instance.cancelOrder(orderId);
       if (success) {
-        await loadOrdersFromDatabase(); // รีโหลดรายการบิลใหม่
+        await loadOrdersFromDatabase(); 
+        await loadDebtRecords();
         notifyListeners();
         return true;
       }

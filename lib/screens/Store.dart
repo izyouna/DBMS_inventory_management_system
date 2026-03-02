@@ -94,7 +94,7 @@ class _StoreScreenState extends State<StoreScreen> {
                 crossAxisCount: 2,
                 mainAxisSpacing: 12,
                 crossAxisSpacing: 12,
-                childAspectRatio: 0.8,
+                childAspectRatio: 0.75, // ปรับให้กระชับขึ้นเพื่อตัดพื้นที่ว่างด้านล่าง
               ),
               itemCount: filtered.length,
               itemBuilder: (context, index) {

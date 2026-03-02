@@ -39,7 +39,7 @@ class StoreItemCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            height: 60,
+            height: 100, // เพิ่มความสูงรูปภาพ
             width: double.infinity,
             decoration: BoxDecoration(
               color: const Color.fromARGB(255, 226, 232, 240),
@@ -60,42 +60,59 @@ class StoreItemCard extends StatelessWidget {
                     ),
                   ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
             product.name,
-            maxLines: 2,
+            maxLines: 2, // คืนค่าเป็น 2 บรรทัด
             overflow: TextOverflow.ellipsis,
             style: GoogleFonts.prompt(
-              fontSize: 14,
+              fontSize: 13, // ลดขนาดฟอนต์เล็กน้อย
               fontWeight: FontWeight.w600,
             ),
           ),
-          const Spacer(),
+          const SizedBox(height: 4),
           Text(
             '฿${product.price.toStringAsFixed(0)}',
             style: GoogleFonts.prompt(
-              fontSize: 16,
+              fontSize: 15,
               fontWeight: FontWeight.bold,
               color: const Color(0xFF1E2736),
             ),
           ),
           const SizedBox(height: 2),
-          product.stock == 0
-              ? Text(
-                  'ของหมด',
-                  style: GoogleFonts.prompt(
-                    fontSize: 12,
-                    color: Colors.red,
-                    fontWeight: FontWeight.bold,
-                  ),
-                )
-              : Text(
-                  'คงเหลือ: ${product.stock}',
-                  style: GoogleFonts.prompt(
-                    fontSize: 12,
-                    color: Colors.grey[600],
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              product.stock == 0
+                  ? Text(
+                      'ของหมด',
+                      style: GoogleFonts.prompt(
+                        fontSize: 10,
+                        color: Colors.red,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    )
+                  : Text(
+                      'คงเหลือ: ${product.stock}',
+                      style: GoogleFonts.prompt(
+                        fontSize: 10,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+              if (product.warehouse?.name != null)
+                Flexible(
+                  child: Text(
+                    product.warehouse!.name,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.prompt(
+                      fontSize: 9,
+                      color: Colors.blue[700],
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
+            ],
+          ),
           const SizedBox(height: 4),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,

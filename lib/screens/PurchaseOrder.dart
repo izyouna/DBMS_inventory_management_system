@@ -97,7 +97,7 @@ class _PurchaseOrderScreenState extends State<PurchaseOrderScreen> {
                 crossAxisCount: 2,
                 mainAxisSpacing: 12,
                 crossAxisSpacing: 12,
-                childAspectRatio: 0.8,
+                childAspectRatio: 0.75, // ปรับให้กระชับขึ้น
               ),
               itemCount: filtered.length,
               itemBuilder: (context, index) {
@@ -108,7 +108,7 @@ class _PurchaseOrderScreenState extends State<PurchaseOrderScreen> {
                   inCart: itemInPo?.quantity ?? 0,
                   onAdd: () => poProvider.addItem(p),
                   onRemove: () => poProvider.removeSingleItem(p.id),
-                  isPurchaseOrder: true, // เพิ่มบรรทัดนี้
+                  isPurchaseOrder: true,
                 );
               },
             ),
