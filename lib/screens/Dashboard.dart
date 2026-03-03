@@ -5,17 +5,12 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import '../providers/product_provider.dart';
 import '../providers/cart_provider.dart';
-import '../providers/purchase_order_provider.dart'; // เพิ่ม import
+import '../providers/purchase_order_provider.dart';
 import '../widgets/summary_card.dart';
 
-class DashboardScreen extends StatefulWidget {
+class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
 
-  @override
-  State<DashboardScreen> createState() => _DashboardScreenState();
-}
-
-class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
@@ -23,29 +18,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: Scaffold(
         backgroundColor: const Color(0xFFF5F6FA),
         appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
           title: Text(
-            "ร้านเกษตรภัณฑ์",
+            'แดชบอร์ด',
             style: GoogleFonts.prompt(
               color: Colors.black,
               fontWeight: FontWeight.bold,
-              fontSize: 22,
+              fontSize: 24,
             ),
           ),
-          backgroundColor: Colors.white,
-          elevation: 0,
           bottom: TabBar(
             labelColor: const Color(0xFF1E2736),
             unselectedLabelColor: Colors.grey,
             indicatorColor: const Color(0xFF1E2736),
             labelStyle: GoogleFonts.prompt(fontWeight: FontWeight.bold),
             tabs: const [
-              Tab(text: 'สรุปการขาย', icon: Icon(Icons.trending_up)),
+              Tab(text: 'สรุปการขาย', icon: Icon(Icons.analytics_outlined)),
               Tab(text: 'สรุปการซื้อ', icon: Icon(Icons.shopping_bag_outlined)),
             ],
           ),
         ),
         body: const TabBarView(
-          children: [SalesDashboardTab(), PurchasesDashboardTab()],
+          children: [
+            SalesDashboardTab(),
+            PurchasesDashboardTab(),
+          ],
         ),
       ),
     );
@@ -57,43 +55,36 @@ class SalesDashboardTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final productProvider = Provider.of<ProductProvider>(context);
     final cartProvider = Provider.of<CartProvider>(context);
-
-    final confirmedOrders = cartProvider.orders
-        .where((o) => o.orderStatus == 'Confirmed')
-        .toList();
+    final orders = cartProvider.orders.where((o) => o.orderStatus == 'Confirmed').toList();
     final now = DateTime.now();
-    final todaySales = confirmedOrders
-        .where(
-          (o) =>
-              o.dateTime.day == now.day &&
-              o.dateTime.month == now.month &&
-              o.dateTime.year == now.year,
-        )
-        .fold(0.0, (sum, o) => sum + o.totalAmount);
-    final monthSales = confirmedOrders
-        .where(
-          (o) => o.dateTime.month == now.month && o.dateTime.year == now.year,
-        )
-        .fold(0.0, (sum, o) => sum + o.totalAmount);
-    final totalDebt = cartProvider.unpaidOrders
-        .where((o) => o.orderStatus == 'Confirmed')
-        .fold(0.0, (sum, o) => sum + o.totalAmount);
 
+    // คำนวณยอดขาย
+    final todaySales = orders.where((o) {
+      return o.dateTime.day == now.day && o.dateTime.month == now.month && o.dateTime.year == now.year;
+    }).fold(0.0, (sum, o) => sum + o.totalAmount);
+
+    final monthSales = orders.where((o) {
+      return o.dateTime.month == now.month && o.dateTime.year == now.year;
+    }).fold(0.0, (sum, o) => sum + o.totalAmount);
+
+    // คำนวณยอดค้างชำระลูกหนี้ (เงินเข้า) จากยอดคงเหลือจริง
+    final totalUnpaid = cartProvider.debtRecords
+        .where((d) => d['DeptStatus'] == 'Pending' && d['DeptRecordStatus'] == 'Confirmed')
+        .fold(0.0, (sum, d) => sum + (d['RemainingAmount'] as num).toDouble());
+
+    final totalOrders = orders.length;
+
+    // ข้อมูลสำหรับกราฟ 7 วันล่าสุด
     final List<BarChartGroupData> barGroups = [];
     final List<String> days = [];
     for (int i = 6; i >= 0; i--) {
       final date = now.subtract(Duration(days: i));
       days.add(DateFormat('E').format(date));
-      final dailyTotal = confirmedOrders
-          .where(
-            (o) =>
-                o.dateTime.day == date.day &&
-                o.dateTime.month == date.month &&
-                o.dateTime.year == date.year,
-          )
-          .fold(0.0, (sum, o) => sum + o.totalAmount);
+      final dailyTotal = orders.where((o) {
+        return o.dateTime.day == date.day && o.dateTime.month == date.month && o.dateTime.year == date.year;
+      }).fold(0.0, (sum, o) => sum + o.totalAmount);
+
       barGroups.add(
         BarChartGroupData(
           x: 6 - i,
@@ -108,50 +99,57 @@ class SalesDashboardTab extends StatelessWidget {
       );
     }
 
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          GridView.count(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisCount: 2,
-            mainAxisSpacing: 10,
-            crossAxisSpacing: 10,
-            padding: const EdgeInsets.all(16),
-            childAspectRatio: 1.25,
-            children: [
-              SummaryCard(
-                title: 'ยอดขายวันนี้',
-                value: '฿${todaySales.toStringAsFixed(0)}',
-                icon: Icons.attach_money,
-                backgroundColor: const Color.fromARGB(255, 196, 243, 220),
-                iconColor: const Color.fromARGB(255, 37, 179, 42),
-              ),
-              SummaryCard(
-                title: 'ยอดขายเดือนนี้',
-                value: '฿${monthSales.toStringAsFixed(0)}',
-                icon: Icons.trending_up,
-                backgroundColor: const Color.fromARGB(255, 194, 217, 255),
-                iconColor: const Color.fromARGB(255, 15, 72, 119),
-              ),
-              SummaryCard(
-                title: 'สินค้าใกล้หมด',
-                value: productProvider.lowStockCount.toString(),
-                icon: Icons.warning_amber_outlined,
-                backgroundColor: const Color.fromARGB(255, 252, 227, 194),
-                iconColor: const Color.fromARGB(255, 218, 128, 10),
-              ),
-              SummaryCard(
-                title: 'ลูกหนี้คงค้าง',
-                value: '฿${totalDebt.toStringAsFixed(0)}',
-                icon: Icons.credit_card,
-                backgroundColor: const Color.fromARGB(255, 255, 205, 205),
-                iconColor: const Color.fromARGB(255, 223, 47, 34),
-              ),
-            ],
-          ),
-          _buildChartSection('ยอดขาย 7 วันล่าสุด', barGroups, days),
-        ],
+    return RefreshIndicator(
+      onRefresh: () async {
+        await cartProvider.loadOrdersFromDatabase();
+        await cartProvider.loadDebtRecords();
+      },
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: Column(
+          children: [
+            GridView.count(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisCount: 2,
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              padding: const EdgeInsets.all(16),
+              childAspectRatio: 1.25,
+              children: [
+                SummaryCard(
+                  title: 'ยอดขายวันนี้',
+                  value: '฿${todaySales.toStringAsFixed(0)}',
+                  icon: Icons.payments_outlined,
+                  backgroundColor: const Color.fromARGB(255, 235, 250, 240),
+                  iconColor: Colors.green,
+                ),
+                SummaryCard(
+                  title: 'ยอดขายเดือนนี้',
+                  value: '฿${monthSales.toStringAsFixed(0)}',
+                  icon: Icons.calendar_month_outlined,
+                  backgroundColor: const Color.fromARGB(255, 230, 245, 255),
+                  iconColor: Colors.blue,
+                ),
+                SummaryCard(
+                  title: 'ยอดลูกหนี้คงเหลือ',
+                  value: '฿${totalUnpaid.toStringAsFixed(0)}',
+                  icon: Icons.person_search_outlined,
+                  backgroundColor: const Color.fromARGB(255, 255, 240, 240),
+                  iconColor: Colors.red,
+                ),
+                SummaryCard(
+                  title: 'จำนวนรายการขาย',
+                  value: totalOrders.toString(),
+                  icon: Icons.receipt_long_outlined,
+                  backgroundColor: const Color.fromARGB(255, 240, 240, 240),
+                  iconColor: Colors.grey[700]!,
+                ),
+              ],
+            ),
+            _buildChartSection('ยอดขาย 7 วันล่าสุด', barGroups, days),
+          ],
+        ),
       ),
     );
   }
@@ -166,10 +164,8 @@ class PurchasesDashboardTab extends StatelessWidget {
     final history = poProvider.purchaseHistory;
     final now = DateTime.now();
 
-    // กรองเฉพาะบิลที่ยืนยันแล้ว (Confirmed)
     final confirmedPOs = history.where((po) => po['Status'] == 'Confirmed').toList();
 
-    // คำนวณสถิติต่างๆ
     final todayInvestment = confirmedPOs.where((po) {
       final date = DateTime.parse(po['ReceiveDate']);
       return date.day == now.day && date.month == now.month && date.year == now.year;
@@ -180,12 +176,12 @@ class PurchasesDashboardTab extends StatelessWidget {
       return date.month == now.month && date.year == now.year;
     }).fold(0.0, (sum, po) => sum + (po['TotalCost'] as num).toDouble());
 
+    // คำนวณยอดค้างชำระเจ้าหนี้ (เงินออก) จากยอดคงเหลือจริง (TotalCost - PaidAmount)
     final totalPending = confirmedPOs.where((po) => po['PaymentStatus'] == 'Pending')
-        .fold(0.0, (sum, po) => sum + (po['TotalCost'] as num).toDouble());
+        .fold(0.0, (sum, po) => sum + ((po['TotalCost'] as num) - (po['PaidAmount'] as num)).toDouble());
 
     final totalBills = confirmedPOs.length;
 
-    // ข้อมูลสำหรับกราฟ 7 วันล่าสุด
     final List<BarChartGroupData> barGroups = [];
     final List<String> days = [];
     for (int i = 6; i >= 0; i--) {
@@ -240,7 +236,7 @@ class PurchasesDashboardTab extends StatelessWidget {
                   iconColor: Colors.purple,
                 ),
                 SummaryCard(
-                  title: 'ยอดค้างชำระ',
+                  title: 'ยอดเจ้าหนี้คงเหลือ',
                   value: '฿${totalPending.toStringAsFixed(0)}',
                   icon: Icons.assignment_late_outlined,
                   backgroundColor: const Color.fromARGB(255, 255, 245, 230),
@@ -284,64 +280,39 @@ class PurchasesDashboardTab extends StatelessWidget {
   }
 }
 
-Widget _buildChartSection(
-  String title,
-  List<BarChartGroupData> groups,
-  List<String> days,
-) {
+Widget _buildChartSection(String title, List<BarChartGroupData> groups, List<String> days) {
   return Container(
-    width: double.infinity,
+    margin: const EdgeInsets.all(16),
     padding: const EdgeInsets.all(20),
-    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-    height: 320,
     decoration: BoxDecoration(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(20),
-      boxShadow: [
-        BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10),
-      ],
+      borderRadius: BorderRadius.circular(24),
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          title,
-          style: GoogleFonts.prompt(fontSize: 18, fontWeight: FontWeight.bold),
-        ),
+        Text(title, style: GoogleFonts.prompt(fontSize: 16, fontWeight: FontWeight.bold)),
         const SizedBox(height: 24),
-        Expanded(
+        SizedBox(
+          height: 200,
           child: BarChart(
             BarChartData(
               alignment: BarChartAlignment.spaceAround,
-              maxY: groups.isEmpty || groups.every((g) => g.barRods[0].toY == 0)
-                  ? 100
-                  : (groups
-                            .map((g) => g.barRods[0].toY)
-                            .reduce((a, b) => a > b ? a : b) *
-                        1.2),
+              maxY: groups.fold(0.0, (max, g) => g.barRods[0].toY > max ? g.barRods[0].toY : max) * 1.2,
               titlesData: FlTitlesData(
+                show: true,
+                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                 bottomTitles: AxisTitles(
                   sideTitles: SideTitles(
                     showTitles: true,
                     getTitlesWidget: (value, meta) {
-                      final index = value.toInt();
-                      return index >= 0 && index < days.length
-                          ? Text(
-                              days[index],
-                              style: GoogleFonts.prompt(fontSize: 10),
-                            )
-                          : const Text('');
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 8.0),
+                        child: Text(days[value.toInt()], style: GoogleFonts.prompt(fontSize: 10, color: Colors.grey)),
+                      );
                     },
                   ),
-                ),
-                leftTitles: const AxisTitles(
-                  sideTitles: SideTitles(showTitles: false),
-                ),
-                topTitles: const AxisTitles(
-                  sideTitles: SideTitles(showTitles: false),
-                ),
-                rightTitles: const AxisTitles(
-                  sideTitles: SideTitles(showTitles: false),
                 ),
               ),
               gridData: const FlGridData(show: false),
