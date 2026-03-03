@@ -19,6 +19,16 @@ class _ReportScreenState extends State<ReportScreen> {
   final List<String> _filters = ['ทั้งหมด', 'เงินสด', 'QR Code / โอนเงิน', 'ขายเชื่อ (ค้างชำระ)', 'ชำระหนี้แล้ว'];
 
   @override
+  void initState() {
+    super.initState();
+    // โหลดข้อมูลล่าสุดเพื่อให้ยอดคำนวณถูกต้อง
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<CartProvider>(context, listen: false).loadOrdersFromDatabase();
+      Provider.of<CartProvider>(context, listen: false).loadDebtRecords();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final cartProvider = Provider.of<CartProvider>(context);
     final now = DateTime.now();
@@ -37,9 +47,10 @@ class _ReportScreenState extends State<ReportScreen> {
     final todaySales = todayOrders.fold(0.0, (sum, o) => sum + o.totalAmount);
     final monthSales = monthOrders.fold(0.0, (sum, o) => sum + o.totalAmount);
     
-    final unpaidTotal = cartProvider.unpaidOrders
-        .where((o) => o.orderStatus == 'Confirmed')
-        .fold(0.0, (sum, o) => sum + o.totalAmount);
+    // คำนวณยอดลูกหนี้คงค้างจริงจากตาราง DebtRecord (RemainingAmount)
+    final unpaidTotal = cartProvider.debtRecords
+        .where((d) => d['DeptStatus'] == 'Pending' && d['DeptRecordStatus'] == 'Confirmed')
+        .fold(0.0, (sum, d) => sum + (d['RemainingAmount'] as num).toDouble());
 
     final filteredOrders = _selectedFilter == 'ทั้งหมด'
         ? cartProvider.orders
@@ -59,160 +70,166 @@ class _ReportScreenState extends State<ReportScreen> {
           ),
         ),
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                _buildReportCard(
-                  title: 'ยอดขายวันนี้',
-                  value: '฿${todaySales.toStringAsFixed(2)}',
-                  color: Colors.green,
-                  icon: Icons.payments_outlined,
-                ),
-                const SizedBox(height: 12),
-                _buildReportCard(
-                  title: 'ยอดขายเดือนนี้',
-                  value: '฿${monthSales.toStringAsFixed(2)}',
-                  color: Colors.blue,
-                  icon: Icons.calendar_month_outlined,
-                ),
-                _buildReportCard(
-                  title: 'ยอดลูกหนี้คงค้าง',
-                  value: '฿${unpaidTotal.toStringAsFixed(2)}',
-                  color: Colors.red,
-                  icon: Icons.person_search_outlined,
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  'ประวัติการซื้อขาย',
-                  style: GoogleFonts.prompt(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await cartProvider.loadOrdersFromDatabase();
+          await cartProvider.loadDebtRecords();
+        },
+        child: Column(
+          children: [
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  _buildReportCard(
+                    title: 'ยอดขายวันนี้',
+                    value: '฿${todaySales.toStringAsFixed(2)}',
+                    color: Colors.green,
+                    icon: Icons.payments_outlined,
                   ),
-                ),
-                const SizedBox(height: 12),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: _filters.map((filter) => Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: FilterChip(
-                        label: Text(filter, style: GoogleFonts.prompt(fontSize: 12)),
-                        selected: _selectedFilter == filter,
-                        onSelected: (selected) {
-                          setState(() {
-                            _selectedFilter = filter;
-                          });
-                        },
-                        selectedColor: Colors.blue.withOpacity(0.2),
-                        checkmarkColor: Colors.blue,
+                  const SizedBox(height: 12),
+                  _buildReportCard(
+                    title: 'ยอดขายเดือนนี้',
+                    value: '฿${monthSales.toStringAsFixed(2)}',
+                    color: Colors.blue,
+                    icon: Icons.calendar_month_outlined,
+                  ),
+                  _buildReportCard(
+                    title: 'ยอดลูกหนี้คงค้าง',
+                    value: '฿${unpaidTotal.toStringAsFixed(2)}',
+                    color: Colors.red,
+                    icon: Icons.person_search_outlined,
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'ประวัติการซื้อขาย',
+                    style: GoogleFonts.prompt(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: _filters.map((filter) => Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: FilterChip(
+                          label: Text(filter, style: GoogleFonts.prompt(fontSize: 12)),
+                          selected: _selectedFilter == filter,
+                          onSelected: (selected) {
+                            setState(() {
+                              _selectedFilter = filter;
+                            });
+                          },
+                          selectedColor: Colors.blue.withOpacity(0.2),
+                          checkmarkColor: Colors.blue,
+                        ),
+                      )).toList(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  if (filteredOrders.isEmpty)
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(32.0),
+                        child: Text('ไม่พบข้อมูล', style: GoogleFonts.prompt(color: Colors.grey)),
+                      ),
+                    )
+                  else
+                    ...filteredOrders.map((order) => Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () => _showOrderDetails(context, order),
+                        child: ListTile(
+                          title: Text(
+                            'บิล: ${order.id}',
+                            style: GoogleFonts.prompt(fontWeight: FontWeight.bold, fontSize: 14),
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${order.dateTime.toString().split('.')[0]} | ${order.paymentMethod}',
+                                style: GoogleFonts.prompt(fontSize: 12),
+                              ),
+                              if (order.customer != null)
+                                Text(
+                                  'ลูกค้า: ${order.customer!.name}',
+                                  style: GoogleFonts.prompt(fontSize: 12, color: Colors.blue),
+                                ),
+                            ],
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    '฿${order.totalAmount.toStringAsFixed(2)}',
+                                    style: GoogleFonts.prompt(
+                                      fontWeight: FontWeight.bold,
+                                      color: order.orderStatus == 'Cancelled' 
+                                          ? Colors.grey 
+                                          : (order.isPaid ? Colors.green : Colors.red),
+                                      decoration: order.orderStatus == 'Cancelled' 
+                                          ? TextDecoration.lineThrough 
+                                          : null,
+                                    ),
+                                  ),
+                                  Text(
+                                    order.orderStatus == 'Cancelled' 
+                                        ? 'บิลถูกยกเลิก' 
+                                        : (order.isPaid ? 'ชำระแล้ว' : 'ค้างชำระ'),
+                                    style: GoogleFonts.prompt(fontSize: 10, color: Colors.grey),
+                                  ),
+                                ],
+                              ),
+                              if (order.orderStatus == 'Confirmed') ...[
+                                const SizedBox(width: 4),
+                                IconButton(
+                                  icon: const Icon(Icons.print, size: 20, color: Colors.blueGrey),
+                                  onPressed: () => PdfService.printOrder(order),
+                                  constraints: const BoxConstraints(),
+                                  padding: const EdgeInsets.all(8),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.cancel_outlined, size: 20, color: Colors.redAccent),
+                                  onPressed: () => _confirmCancel(context, order),
+                                  constraints: const BoxConstraints(),
+                                  padding: const EdgeInsets.all(8),
+                                ),
+                              ] else
+                                Container(
+                                  margin: const EdgeInsets.only(left: 12),
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red[50],
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    'Cancelled',
+                                    style: GoogleFonts.prompt(
+                                      color: Colors.red[400],
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
                       ),
                     )).toList(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                if (filteredOrders.isEmpty)
-                  Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(32.0),
-                      child: Text('ไม่พบข้อมูล', style: GoogleFonts.prompt(color: Colors.grey)),
-                    ),
-                  )
-                else
-                  ...filteredOrders.map((order) => Card(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(12),
-                      onTap: () => _showOrderDetails(context, order),
-                      child: ListTile(
-                        title: Text(
-                          'บิล: ${order.id}',
-                          style: GoogleFonts.prompt(fontWeight: FontWeight.bold, fontSize: 14),
-                        ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '${order.dateTime.toString().split('.')[0]} | ${order.paymentMethod}',
-                              style: GoogleFonts.prompt(fontSize: 12),
-                            ),
-                            if (order.customer != null)
-                              Text(
-                                'ลูกค้า: ${order.customer!.name}',
-                                style: GoogleFonts.prompt(fontSize: 12, color: Colors.blue),
-                              ),
-                          ],
-                        ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Text(
-                                  '฿${order.totalAmount.toStringAsFixed(2)}',
-                                  style: GoogleFonts.prompt(
-                                    fontWeight: FontWeight.bold,
-                                    color: order.orderStatus == 'Cancelled' 
-                                        ? Colors.grey 
-                                        : (order.isPaid ? Colors.green : Colors.red),
-                                    decoration: order.orderStatus == 'Cancelled' 
-                                        ? TextDecoration.lineThrough 
-                                        : null,
-                                  ),
-                                ),
-                                Text(
-                                  order.orderStatus == 'Cancelled' 
-                                      ? 'บิลถูกยกเลิก' 
-                                      : (order.isPaid ? 'ชำระแล้ว' : 'ค้างชำระ'),
-                                  style: GoogleFonts.prompt(fontSize: 10, color: Colors.grey),
-                                ),
-                              ],
-                            ),
-                            if (order.orderStatus == 'Confirmed') ...[
-                              const SizedBox(width: 4),
-                              IconButton(
-                                icon: const Icon(Icons.print, size: 20, color: Colors.blueGrey),
-                                onPressed: () => PdfService.printOrder(order),
-                                constraints: const BoxConstraints(),
-                                padding: const EdgeInsets.all(8),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.cancel_outlined, size: 20, color: Colors.redAccent),
-                                onPressed: () => _confirmCancel(context, order),
-                                constraints: const BoxConstraints(),
-                                padding: const EdgeInsets.all(8),
-                              ),
-                            ] else
-                              Container(
-                                margin: const EdgeInsets.only(left: 12),
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: Colors.red[50],
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  'Cancelled',
-                                  style: GoogleFonts.prompt(
-                                    color: Colors.red[400],
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 11,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  )).toList(),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
