@@ -141,6 +141,11 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
                                 'วันที่: ${date.toString().split('.')[0]}',
                                 style: GoogleFonts.prompt(fontSize: 12),
                               ),
+                              if (po['SupplierName'] != null)
+                                Text(
+                                  'ผู้จัดจำหน่าย: ${po['SupplierName']}',
+                                  style: GoogleFonts.prompt(fontSize: 11, color: Colors.blueGrey),
+                                ),
                               Text(
                                 'ประเภท: ${po['PTName'] ?? 'ไม่ระบุ'}',
                                 style: GoogleFonts.prompt(fontSize: 11, color: Colors.blueGrey),
@@ -233,6 +238,8 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
               ],
             ),
             Text(po['POID'], style: GoogleFonts.prompt(fontSize: 14, color: Colors.grey)),
+            if (po['SupplierName'] != null)
+              Text('ผู้จัดจำหน่าย: ${po['SupplierName']}', style: GoogleFonts.prompt(fontSize: 12, color: Colors.blueGrey)),
             Text('ประเภทการชำระ: ${po['PTName'] ?? '-'}', style: GoogleFonts.prompt(fontSize: 12, color: Colors.blueGrey)),
           ],
         ),
