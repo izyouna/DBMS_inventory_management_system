@@ -55,10 +55,12 @@ class _PurchaseOrderCartScreenState extends State<PurchaseOrderCartScreen> {
       ),
       body: Column(
         children: [
-          _buildBillImageSection(),
           Expanded(
             child: ListView(
               children: [
+                _buildSupplierSection(poProvider),
+                const Divider(thickness: 1, color: Color(0xFFEEEEEE)),
+                _buildBillImageSection(),
                 const Divider(thickness: 8, color: Color(0xFFF5F6FA)),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -77,6 +79,105 @@ class _PurchaseOrderCartScreenState extends State<PurchaseOrderCartScreen> {
             ),
           ),
           _buildSummary(context, poProvider),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSupplierSection(PurchaseOrderProvider poProvider) {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('ผู้จัดจำหน่าย (Supplier)', 
+                style: GoogleFonts.prompt(fontWeight: FontWeight.w600, fontSize: 16)),
+              TextButton.icon(
+                onPressed: () => _showAddSupplierDialog(poProvider),
+                icon: const Icon(Icons.add, size: 18),
+                label: Text('เพิ่มใหม่', style: GoogleFonts.prompt(fontSize: 12)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey[300]!),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                isExpanded: true,
+                hint: Text('เลือกผู้จัดจำหน่าย', style: GoogleFonts.prompt()),
+                value: poProvider.selectedSupplierId,
+                items: [
+                  DropdownMenuItem<String>(
+                    value: null,
+                    child: Text('ไม่ระบุผู้จัดจำหน่าย', style: GoogleFonts.prompt()),
+                  ),
+                  ...poProvider.suppliers.map((s) {
+                    return DropdownMenuItem<String>(
+                      value: s['SupplierID'],
+                      child: Text(s['SupplierName'], style: GoogleFonts.prompt()),
+                    );
+                  }).toList(),
+                ],
+                onChanged: (val) => poProvider.selectSupplier(val),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAddSupplierDialog(PurchaseOrderProvider provider) {
+    final nameController = TextEditingController();
+    final phoneController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('เพิ่มผู้จัดจำหน่าย', style: GoogleFonts.prompt(fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: InputDecoration(
+                labelText: 'ชื่อผู้จัดจำหน่าย',
+                labelStyle: GoogleFonts.prompt(),
+                border: const OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: phoneController,
+              keyboardType: TextInputType.phone,
+              decoration: InputDecoration(
+                labelText: 'เบอร์โทรศัพท์',
+                labelStyle: GoogleFonts.prompt(),
+                border: const OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('ยกเลิก', style: GoogleFonts.prompt())),
+          ElevatedButton(
+            onPressed: () async {
+              if (nameController.text.isNotEmpty) {
+                await provider.addSupplier(nameController.text, phoneController.text);
+                if (mounted) Navigator.pop(ctx);
+              }
+            },
+            child: Text('บันทึก', style: GoogleFonts.prompt()),
+          ),
         ],
       ),
     );
@@ -373,6 +474,7 @@ class _PurchaseOrderCartScreenState extends State<PurchaseOrderCartScreen> {
                   billImagePath: _billImage?.path, // ส่งพาธรูปภาพบิล
                   purchaseType: _paymentMethod == 'Cash' ? 'เงินสด' : 'ค้างชำระ (เครดิต)', // กำหนดประเภท
                   paymentStatus: _paymentMethod == 'Cash' ? 'Paid' : 'Pending', // ส่งสถานะการชำระเงิน
+                  supplierId: poProvider.selectedSupplierId,
                 );
 
                 // 3. รีโหลดข้อมูลสินค้าใน Provider เพื่อให้ UI อัปเดตสต็อกล่าสุด

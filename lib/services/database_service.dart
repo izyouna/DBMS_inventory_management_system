@@ -34,6 +34,7 @@ class DatabaseService {
   final String _creditPaymentHistoryTableName = "CreditPaymentHistory";
   final String _debtRecordTableName = "DebtRecord";
   final String _debtPaymentHistoryTableName = "DeptPaymentHistory"; // ตารางประวัติการชำระหนี้ (ลูกหนี้)
+  final String _supplierTableName = "Supplier";
 
   // Product Columns
   final String _productIdColumnName = "ProductID";
@@ -44,6 +45,11 @@ class DatabaseService {
   final String _productUnitColumnName = "Unit";
   final String _productImagePathColumnName = "ImagePath";
   final String _productWarehouseIdColumnName = "WarehouseID";
+
+  // Supplier Columns
+  final String _supplierIdColumnName = "SupplierID";
+  final String _supplierNameColumnName = "SupplierName";
+  final String _supplierPhoneColumnName = "Phone";
 
   // Warehouse Columns
   final String _warehouseIdColumnName = "WarehouseID";
@@ -74,6 +80,7 @@ class DatabaseService {
   final String _poStatusColumnName = "Status"; 
   final String _poPaymentStatusColumnName = "PaymentStatus"; 
   final String _poTypeIdColumnName = "PTID";
+  final String _poSupplierIdColumnName = "SupplierID";
 
   // PurchaseType Columns
   final String _ptIdColumnName = "PTID";
@@ -123,13 +130,13 @@ class DatabaseService {
     return await databaseFactory.openDatabase(
       databasePath,
       options: OpenDatabaseOptions(
-        version: 17, // อัปเกรดเป็น 17
+        version: 18, // อัปเกรดเป็น 18 เพิ่ม Supplier
         onCreate: (db, version) async {
           await _createTables(db);
           await _seedInitialData(db);
         },
         onUpgrade: (db, oldVersion, newVersion) async {
-          if (oldVersion < 17) {
+          if (oldVersion < 18) {
             await db.execute("DROP TABLE IF EXISTS $_debtPaymentHistoryTableName");
             await db.execute("DROP TABLE IF EXISTS $_debtRecordTableName");
             await db.execute("DROP TABLE IF EXISTS $_creditPaymentHistoryTableName");
@@ -141,6 +148,7 @@ class DatabaseService {
             await db.execute("DROP TABLE IF EXISTS $_saleOrderTableName");
             await db.execute("DROP TABLE IF EXISTS $_productTableName");
             await db.execute("DROP TABLE IF EXISTS $_warehouseTableName");
+            await db.execute("DROP TABLE IF EXISTS $_supplierTableName");
             await _createTables(db);
             await _seedInitialData(db);
           }
@@ -154,6 +162,14 @@ class DatabaseService {
       CREATE TABLE $_warehouseTableName(
         $_warehouseIdColumnName TEXT PRIMARY KEY,
         $_warehouseNameColumnName TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE $_supplierTableName(
+        $_supplierIdColumnName TEXT PRIMARY KEY,
+        $_supplierNameColumnName TEXT NOT NULL,
+        $_supplierPhoneColumnName TEXT
       )
     ''');
 
@@ -219,7 +235,9 @@ class DatabaseService {
         $_poStatusColumnName TEXT NOT NULL,
         $_poPaymentStatusColumnName TEXT NOT NULL,
         $_poTypeIdColumnName TEXT,
-        FOREIGN KEY ($_poTypeIdColumnName) REFERENCES $_purchaseTypeTableName($_ptIdColumnName)
+        $_poSupplierIdColumnName TEXT,
+        FOREIGN KEY ($_poTypeIdColumnName) REFERENCES $_purchaseTypeTableName($_ptIdColumnName),
+        FOREIGN KEY ($_poSupplierIdColumnName) REFERENCES $_supplierTableName($_supplierIdColumnName)
       )
     ''');
 
@@ -313,6 +331,52 @@ class DatabaseService {
     final db = await database;
     if (db == null) return [];
     return await db.query(_warehouseTableName);
+  }
+
+  // --- Supplier Methods ---
+  Future<String> addSupplier({
+    required String name,
+    required String phone,
+  }) async {
+    final db = await database;
+    if (db == null) return "";
+    final newId = await _generateCustomId(_supplierTableName, _supplierIdColumnName, "S");
+    await db.insert(_supplierTableName, {
+      _supplierIdColumnName: newId,
+      _supplierNameColumnName: name,
+      _supplierPhoneColumnName: phone,
+    });
+    return newId;
+  }
+
+  Future<List<Map<String, dynamic>>> getSuppliers() async {
+    final db = await database;
+    if (db == null) return [];
+    return await db.query(_supplierTableName);
+  }
+
+  Future<int> deleteSupplier(String id) async {
+    final db = await database;
+    if (db == null) return 0;
+    return await db.delete(_supplierTableName, where: '$_supplierIdColumnName = ?', whereArgs: [id]);
+  }
+
+  Future<int> updateSupplier({
+    required String id,
+    required String name,
+    required String phone,
+  }) async {
+    final db = await database;
+    if (db == null) return 0;
+    return await db.update(
+      _supplierTableName,
+      {
+        _supplierNameColumnName: name,
+        _supplierPhoneColumnName: phone,
+      },
+      where: '$_supplierIdColumnName = ?',
+      whereArgs: [id],
+    );
   }
 
   // --- Product Methods ---
@@ -614,6 +678,7 @@ class DatabaseService {
     String? billImagePath,
     required String purchaseType,
     required String paymentStatus,
+    String? supplierId,
   }) async {
     final poId = 'PO-${DateTime.now().millisecondsSinceEpoch}';
 
@@ -637,6 +702,7 @@ class DatabaseService {
         _poStatusColumnName: 'Confirmed', 
         _poPaymentStatusColumnName: paymentStatus,
         _poTypeIdColumnName: ptId,
+        _poSupplierIdColumnName: supplierId,
       });
 
       for (var item in items) {
@@ -773,9 +839,10 @@ class DatabaseService {
     final db = await database;
     if (db == null) return [];
     return await db.rawQuery('''
-      SELECT po.*, pt.$_ptNameColumnName
+      SELECT po.*, pt.$_ptNameColumnName, s.$_supplierNameColumnName
       FROM $_purchaseOrderTableName po
       LEFT JOIN $_purchaseTypeTableName pt ON po.$_poTypeIdColumnName = pt.$_ptIdColumnName
+      LEFT JOIN $_supplierTableName s ON po.$_poSupplierIdColumnName = s.$_supplierIdColumnName
       ORDER BY po.$_poReceiveDateColumnName DESC
     ''');
   }

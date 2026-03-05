@@ -19,9 +19,13 @@ class PurchaseOrderItem {
 class PurchaseOrderProvider with ChangeNotifier {
   final Map<String, PurchaseOrderItem> _items = {};
   List<Map<String, dynamic>> _purchaseHistory = [];
+  List<Map<String, dynamic>> _suppliers = [];
+  String? _selectedSupplierId;
 
   Map<String, PurchaseOrderItem> get items => {..._items};
   List<Map<String, dynamic>> get purchaseHistory => _purchaseHistory;
+  List<Map<String, dynamic>> get suppliers => _suppliers;
+  String? get selectedSupplierId => _selectedSupplierId;
 
   int get itemCount => _items.length;
 
@@ -35,6 +39,26 @@ class PurchaseOrderProvider with ChangeNotifier {
 
   PurchaseOrderProvider() {
     loadPurchaseHistory();
+    loadSuppliers();
+  }
+
+  Future<void> loadSuppliers() async {
+    try {
+      _suppliers = await DatabaseService.instance.getSuppliers();
+      notifyListeners();
+    } catch (e) {
+      debugPrint("Error loading suppliers: $e");
+    }
+  }
+
+  void selectSupplier(String? id) {
+    _selectedSupplierId = id;
+    notifyListeners();
+  }
+
+  Future<void> addSupplier(String name, String phone) async {
+    await DatabaseService.instance.addSupplier(name: name, phone: phone);
+    await loadSuppliers();
   }
 
   Future<void> loadPurchaseHistory() async {
@@ -130,6 +154,7 @@ class PurchaseOrderProvider with ChangeNotifier {
 
   void clear() {
     _items.clear();
+    _selectedSupplierId = null;
     notifyListeners();
   }
 }
