@@ -281,6 +281,10 @@ class PurchasesDashboardTab extends StatelessWidget {
 }
 
 Widget _buildChartSection(String title, List<BarChartGroupData> groups, List<String> days) {
+  double calculatedMaxY = groups.fold(0.0, (max, g) => g.barRods[0].toY > max ? g.barRods[0].toY : max);
+  // ป้องกัน maxY เป็น 0 และเผื่อพื้นที่ด้านบน 20%
+  double maxY = calculatedMaxY == 0 ? 100 : calculatedMaxY * 1.2;
+
   return Container(
     margin: const EdgeInsets.all(16),
     padding: const EdgeInsets.all(20),
@@ -294,30 +298,70 @@ Widget _buildChartSection(String title, List<BarChartGroupData> groups, List<Str
         Text(title, style: GoogleFonts.prompt(fontSize: 16, fontWeight: FontWeight.bold)),
         const SizedBox(height: 24),
         SizedBox(
-          height: 200,
+          height: 220, // เพิ่มความสูงเล็กน้อยเพื่อให้เห็นตัวเลขชัดขึ้น
           child: BarChart(
             BarChartData(
               alignment: BarChartAlignment.spaceAround,
-              maxY: groups.fold(0.0, (max, g) => g.barRods[0].toY > max ? g.barRods[0].toY : max) * 1.2,
+              maxY: maxY,
+              minY: 0,
               titlesData: FlTitlesData(
                 show: true,
                 rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                 topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 40,
+                    getTitlesWidget: (value, meta) {
+                      if (value == meta.max) return Container(); // ไม่แสดงค่าสูงสุดที่ขอบบนสุด
+                      String text = '';
+                      if (value >= 1000000) {
+                        text = '${(value / 1000000).toStringAsFixed(1)}M';
+                      } else if (value >= 1000) {
+                        text = '${(value / 1000).toStringAsFixed(0)}K';
+                      } else {
+                        text = value.toInt().toString();
+                      }
+                      return Text(text, style: GoogleFonts.prompt(fontSize: 10, color: Colors.grey));
+                    },
+                  ),
+                ),
                 bottomTitles: AxisTitles(
                   sideTitles: SideTitles(
                     showTitles: true,
                     getTitlesWidget: (value, meta) {
+                      int index = value.toInt();
+                      if (index < 0 || index >= days.length) return Container();
                       return Padding(
                         padding: const EdgeInsets.only(top: 8.0),
-                        child: Text(days[value.toInt()], style: GoogleFonts.prompt(fontSize: 10, color: Colors.grey)),
+                        child: Text(days[index], style: GoogleFonts.prompt(fontSize: 10, color: Colors.grey)),
                       );
                     },
                   ),
                 ),
               ),
-              gridData: const FlGridData(show: false),
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: false,
+                horizontalInterval: maxY / 4, // แบ่งเส้นตารางเป็น 4 ส่วน
+                getDrawingHorizontalLine: (value) => FlLine(
+                  color: Colors.grey[200]!,
+                  strokeWidth: 1,
+                ),
+              ),
               borderData: FlBorderData(show: false),
               barGroups: groups,
+              barTouchData: BarTouchData(
+                touchTooltipData: BarTouchTooltipData(
+                  getTooltipColor: (_) => const Color(0xFF1E2736),
+                  getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                    return BarTooltipItem(
+                      '฿${NumberFormat('#,###').format(rod.toY)}',
+                      GoogleFonts.prompt(color: Colors.white, fontWeight: FontWeight.bold),
+                    );
+                  },
+                ),
+              ),
             ),
           ),
         ),
