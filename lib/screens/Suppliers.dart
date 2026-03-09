@@ -147,8 +147,62 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
   }
 
   void _showEditSupplierDialog(BuildContext context, PurchaseOrderProvider provider, Map<String, dynamic> supplier) {
-    // ฟังก์ชันแก้ไขใน DatabaseService มีอยู่แล้ว แต่ใน Provider ยังไม่ได้เรียกใช้
-    // เพื่อความรวดเร็วจะเรียกผ่าน DatabaseService โดยตรง หรือจะเพิ่มใน Provider ก็ได้
-    // ในที่นี้สมมติว่าผู้ใช้ต้องการแค่ดูและเพิ่มก่อน หากต้องการแก้ไขสามารถเพิ่ม Method ใน Provider ได้
+    final nameController = TextEditingController(text: supplier['SupplierName']);
+    final phoneController = TextEditingController(text: supplier['Phone']);
+    final String supplierId = supplier['SupplierID'].toString();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('แก้ไขผู้จัดจำหน่าย', style: GoogleFonts.prompt(fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: InputDecoration(
+                labelText: 'ชื่อผู้จัดจำหน่าย',
+                labelStyle: GoogleFonts.prompt(),
+                border: const OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: phoneController,
+              keyboardType: TextInputType.phone,
+              decoration: InputDecoration(
+                labelText: 'เบอร์โทรศัพท์',
+                labelStyle: GoogleFonts.prompt(),
+                border: const OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('ยกเลิก', style: GoogleFonts.prompt(color: Colors.red)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (nameController.text.isNotEmpty) {
+                await provider.updateSupplier(
+                  supplierId,
+                  nameController.text,
+                  phoneController.text,
+                );
+                if (mounted) Navigator.pop(ctx);
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF1E2736),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: Text('บันทึก', style: GoogleFonts.prompt(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
   }
 }

@@ -31,16 +31,6 @@ void main() async {
     databaseFactory = databaseFactoryFfi;
   }
 
-  // ใส่ try-catch แก้ป้องกันแอปค้างที่หน้าจอขาวหากฐานข้อมูลมีปัญหา
-  try {
-    // พิมพ์ข้อมูลเพื่อ Debug
-    await DatabaseService.instance.printAllProducts().catchError((e) {
-      debugPrint("Database Error: $e");
-    });
-  } catch (e) {
-    debugPrint("Initialization Error: $e");
-  }
-
   runApp(
     MultiProvider(
       providers: [
