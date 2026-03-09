@@ -13,6 +13,7 @@ class DatabaseService {
     {'WarehouseID': 'W2', 'WarehouseName': 'โรงรถ'},
     {'WarehouseID': 'W3', 'WarehouseName': 'คลังสินค้าหลังร้าน'},
   ];
+  final List<Map<String, dynamic>> _webSupplierMemoryDb = [];
   final List<Map<String, dynamic>> _webPaymentTypeDb = [
     {'PaymentID': 'PAY1', 'TypeName': 'เงินสด'},
     {'PaymentID': 'PAY2', 'TypeName': 'QR Code / โอนเงิน'},
@@ -33,7 +34,8 @@ class DatabaseService {
   final String _purchaseTypeTableName = "PurchaseType";
   final String _creditPaymentHistoryTableName = "CreditPaymentHistory";
   final String _debtRecordTableName = "DebtRecord";
-  final String _debtPaymentHistoryTableName = "DeptPaymentHistory"; // ตารางประวัติการชำระหนี้ (ลูกหนี้)
+  final String _debtPaymentHistoryTableName =
+      "DeptPaymentHistory"; // ตารางประวัติการชำระหนี้ (ลูกหนี้)
   final String _supplierTableName = "Supplier";
 
   // Product Columns
@@ -45,6 +47,7 @@ class DatabaseService {
   final String _productUnitColumnName = "Unit";
   final String _productImagePathColumnName = "ImagePath";
   final String _productWarehouseIdColumnName = "WarehouseID";
+  final String _productIsActiveColumnName = "IsActive";
 
   // Supplier Columns
   final String _supplierIdColumnName = "SupplierID";
@@ -75,10 +78,10 @@ class DatabaseService {
   final String _poIdColumnName = "POID";
   final String _poReceiveDateColumnName = "ReceiveDate";
   final String _poTotalCostColumnName = "TotalCost";
-  final String _poPaidAmountColumnName = "PaidAmount"; 
+  final String _poPaidAmountColumnName = "PaidAmount";
   final String _poBillImagePathColumnName = "BillImagePath";
-  final String _poStatusColumnName = "Status"; 
-  final String _poPaymentStatusColumnName = "PaymentStatus"; 
+  final String _poStatusColumnName = "Status";
+  final String _poPaymentStatusColumnName = "PaymentStatus";
   final String _poTypeIdColumnName = "PTID";
   final String _poSupplierIdColumnName = "SupplierID";
 
@@ -94,8 +97,8 @@ class DatabaseService {
 
   // DebtRecord Columns
   final String _debtIdColumnName = "DebtID";
-  final String _debtStatusColumnName = "DeptStatus"; 
-  final String _debtRecordStatusColumnName = "DeptRecordStatus"; 
+  final String _debtStatusColumnName = "DeptStatus";
+  final String _debtRecordStatusColumnName = "DeptRecordStatus";
   final String _debtOriginalAmountColumnName = "OriginalAmount";
   final String _debtRemainingAmountColumnName = "RemainingAmount";
   final String _debtStartDateColumnName = "StartDate";
@@ -130,13 +133,14 @@ class DatabaseService {
     return await databaseFactory.openDatabase(
       databasePath,
       options: OpenDatabaseOptions(
-        version: 18, // อัปเกรดเป็น 18 เพิ่ม Supplier
+        version: 19, // อัปเกรดเป็น 19 เพิ่ม IsActive ใน Product
         onCreate: (db, version) async {
           await _createTables(db);
           await _seedInitialData(db);
         },
         onUpgrade: (db, oldVersion, newVersion) async {
           if (oldVersion < 18) {
+            // ล้างไพ่ถ้าเวอร์ชันต่ำกว่า 18 (ช่วงพัฒนา)
             await db.execute("DROP TABLE IF EXISTS $_debtPaymentHistoryTableName");
             await db.execute("DROP TABLE IF EXISTS $_debtRecordTableName");
             await db.execute("DROP TABLE IF EXISTS $_creditPaymentHistoryTableName");
@@ -151,7 +155,22 @@ class DatabaseService {
             await db.execute("DROP TABLE IF EXISTS $_supplierTableName");
             await _createTables(db);
             await _seedInitialData(db);
+          } else {
+            // อัปเกรดแบบรักษาข้อมูล
+            if (oldVersion == 18) {
+              // เพิ่ม IsActive ใน Product สำหรับเวอร์ชัน 19
+              await db.execute("ALTER TABLE $_productTableName ADD COLUMN $_productIsActiveColumnName INTEGER DEFAULT 1");
+            }
           }
+
+          // ตรวจสอบความปลอดภัย: ตรวจว่าตาราง Supplier มีอยู่จริงหรือไม่ (กรณีหลุดจาก migration ก่อนหน้า)
+          await db.execute('''
+            CREATE TABLE IF NOT EXISTS $_supplierTableName(
+              $_supplierIdColumnName TEXT PRIMARY KEY,
+              $_supplierNameColumnName TEXT NOT NULL,
+              $_supplierPhoneColumnName TEXT
+            )
+          ''');
         },
       ),
     );
@@ -197,6 +216,7 @@ class DatabaseService {
         $_productUnitColumnName TEXT,
         $_productImagePathColumnName TEXT,
         $_productWarehouseIdColumnName TEXT,
+        $_productIsActiveColumnName INTEGER DEFAULT 1,
         FOREIGN KEY ($_productWarehouseIdColumnName) REFERENCES $_warehouseTableName($_warehouseIdColumnName)
       )
     ''');
@@ -292,24 +312,66 @@ class DatabaseService {
   }
 
   Future<void> _seedInitialData(Database db) async {
-    await db.insert(_warehouseTableName, {_warehouseIdColumnName: 'W1', _warehouseNameColumnName: 'หน้าร้าน'});
-    await db.insert(_warehouseTableName, {_warehouseIdColumnName: 'W2', _warehouseNameColumnName: 'โรงรถ'});
-    await db.insert(_warehouseTableName, {_warehouseIdColumnName: 'W3', _warehouseNameColumnName: 'คลังสินค้าหลังร้าน'});
+    await db.insert(_warehouseTableName, {
+      _warehouseIdColumnName: 'W1',
+      _warehouseNameColumnName: 'หน้าร้าน',
+    });
+    await db.insert(_warehouseTableName, {
+      _warehouseIdColumnName: 'W2',
+      _warehouseNameColumnName: 'โรงรถ',
+    });
+    await db.insert(_warehouseTableName, {
+      _warehouseIdColumnName: 'W3',
+      _warehouseNameColumnName: 'คลังสินค้าหลังร้าน',
+    });
 
-    await db.insert(_paymentTypeTableName, {_paymentIdColumnName: 'PAY1', _paymentTypeNameColumnName: 'เงินสด'});
-    await db.insert(_paymentTypeTableName, {_paymentIdColumnName: 'PAY2', _paymentTypeNameColumnName: 'QR Code / โอนเงิน'});
-    await db.insert(_paymentTypeTableName, {_paymentIdColumnName: 'PAY3', _paymentTypeNameColumnName: 'ขายเชื่อ (ค้างชำระ)'});
+    await db.insert(_paymentTypeTableName, {
+      _paymentIdColumnName: 'PAY1',
+      _paymentTypeNameColumnName: 'เงินสด',
+    });
+    await db.insert(_paymentTypeTableName, {
+      _paymentIdColumnName: 'PAY2',
+      _paymentTypeNameColumnName: 'QR Code / โอนเงิน',
+    });
+    await db.insert(_paymentTypeTableName, {
+      _paymentIdColumnName: 'PAY3',
+      _paymentTypeNameColumnName: 'ขายเชื่อ (ค้างชำระ)',
+    });
 
-    await db.insert(_purchaseTypeTableName, {_ptIdColumnName: 'PT1', _ptNameColumnName: 'เงินสด'});
-    await db.insert(_purchaseTypeTableName, {_ptIdColumnName: 'PT2', _ptNameColumnName: 'ค้างชำระ (เครดิต)'});
+    await db.insert(_purchaseTypeTableName, {
+      _ptIdColumnName: 'PT1',
+      _ptNameColumnName: 'เงินสด',
+    });
+    await db.insert(_purchaseTypeTableName, {
+      _ptIdColumnName: 'PT2',
+      _ptNameColumnName: 'ค้างชำระ (เครดิต)',
+    });
   }
 
-  Future<String> _generateCustomId(String tableName, String idColumn, String prefix) async {
+  Future<String> _generateCustomId(
+    String tableName,
+    String idColumn,
+    String prefix,
+  ) async {
     final db = await database;
     if (db == null) return "${prefix}1";
-    final result = await db.rawQuery('SELECT COUNT(*) as count FROM $tableName');
-    int count = Sqflite.firstIntValue(result) ?? 0;
-    return "$prefix${count + 1}";
+    
+    // ค้นหา ID สูงสุดที่มีอยู่
+    final result = await db.rawQuery('SELECT $idColumn FROM $tableName');
+    if (result.isEmpty) return "${prefix}1";
+
+    int maxId = 0;
+    for (var row in result) {
+      String idStr = row[idColumn].toString();
+      if (idStr.startsWith(prefix)) {
+        int? currentId = int.tryParse(idStr.substring(prefix.length));
+        if (currentId != null && currentId > maxId) {
+          maxId = currentId;
+        }
+      }
+    }
+    
+    return "$prefix${maxId + 1}";
   }
 
   // --- Warehouse Methods ---
@@ -321,8 +383,15 @@ class DatabaseService {
     }
     final db = await database;
     if (db == null) return "";
-    final newId = await _generateCustomId(_warehouseTableName, _warehouseIdColumnName, "W");
-    await db.insert(_warehouseTableName, {_warehouseIdColumnName: newId, _warehouseNameColumnName: name});
+    final newId = await _generateCustomId(
+      _warehouseTableName,
+      _warehouseIdColumnName,
+      "W",
+    );
+    await db.insert(_warehouseTableName, {
+      _warehouseIdColumnName: newId,
+      _warehouseNameColumnName: name,
+    });
     return newId;
   }
 
@@ -338,9 +407,22 @@ class DatabaseService {
     required String name,
     required String phone,
   }) async {
+    if (kIsWeb) {
+      final newId = "S${_webSupplierMemoryDb.length + 1}";
+      _webSupplierMemoryDb.add({
+        _supplierIdColumnName: newId,
+        _supplierNameColumnName: name,
+        _supplierPhoneColumnName: phone,
+      });
+      return newId;
+    }
     final db = await database;
     if (db == null) return "";
-    final newId = await _generateCustomId(_supplierTableName, _supplierIdColumnName, "S");
+    final newId = await _generateCustomId(
+      _supplierTableName,
+      _supplierIdColumnName,
+      "S",
+    );
     await db.insert(_supplierTableName, {
       _supplierIdColumnName: newId,
       _supplierNameColumnName: name,
@@ -350,15 +432,25 @@ class DatabaseService {
   }
 
   Future<List<Map<String, dynamic>>> getSuppliers() async {
+    if (kIsWeb) return List<Map<String, dynamic>>.from(_webSupplierMemoryDb);
     final db = await database;
     if (db == null) return [];
     return await db.query(_supplierTableName);
   }
 
   Future<int> deleteSupplier(String id) async {
+    if (kIsWeb) {
+      final count = _webSupplierMemoryDb.length;
+      _webSupplierMemoryDb.removeWhere((s) => s[_supplierIdColumnName] == id);
+      return count != _webSupplierMemoryDb.length ? 1 : 0;
+    }
     final db = await database;
     if (db == null) return 0;
-    return await db.delete(_supplierTableName, where: '$_supplierIdColumnName = ?', whereArgs: [id]);
+    return await db.delete(
+      _supplierTableName,
+      where: '$_supplierIdColumnName = ?',
+      whereArgs: [id],
+    );
   }
 
   Future<int> updateSupplier({
@@ -366,14 +458,22 @@ class DatabaseService {
     required String name,
     required String phone,
   }) async {
+    if (kIsWeb) {
+      final index = _webSupplierMemoryDb.indexWhere(
+        (s) => s[_supplierIdColumnName] == id,
+      );
+      if (index != -1) {
+        _webSupplierMemoryDb[index][_supplierNameColumnName] = name;
+        _webSupplierMemoryDb[index][_supplierPhoneColumnName] = phone;
+        return 1;
+      }
+      return 0;
+    }
     final db = await database;
     if (db == null) return 0;
     return await db.update(
       _supplierTableName,
-      {
-        _supplierNameColumnName: name,
-        _supplierPhoneColumnName: phone,
-      },
+      {_supplierNameColumnName: name, _supplierPhoneColumnName: phone},
       where: '$_supplierIdColumnName = ?',
       whereArgs: [id],
     );
@@ -400,12 +500,17 @@ class DatabaseService {
         _productUnitColumnName: unit,
         _productImagePathColumnName: imagePath,
         _productWarehouseIdColumnName: warehouseId,
+        _productIsActiveColumnName: 1,
       });
       return newId;
     }
     final db = await database;
     if (db == null) return "";
-    final newId = await _generateCustomId(_productTableName, _productIdColumnName, "P");
+    final newId = await _generateCustomId(
+      _productTableName,
+      _productIdColumnName,
+      "P",
+    );
     final data = {
       _productIdColumnName: newId,
       _productNameColumnName: name,
@@ -415,6 +520,7 @@ class DatabaseService {
       _productUnitColumnName: unit,
       _productImagePathColumnName: imagePath,
       _productWarehouseIdColumnName: warehouseId,
+      _productIsActiveColumnName: 1,
     };
     await db.insert(_productTableName, data);
     return newId;
@@ -422,15 +528,21 @@ class DatabaseService {
 
   Future<List<Map<String, dynamic>>> getProducts() async {
     if (kIsWeb) {
-      return _webMemoryDb.map((product) {
-        final warehouse = _webWarehouseMemoryDb.firstWhere(
-          (w) => w['WarehouseID'].toString() == product[_productWarehouseIdColumnName]?.toString(),
-          orElse: () => {},
-        );
-        final result = Map<String, dynamic>.from(product);
-        if (warehouse.isNotEmpty) result['WarehouseName'] = warehouse['WarehouseName'];
-        return result;
-      }).toList();
+      return _webMemoryDb
+          .where((p) => (p[_productIsActiveColumnName] ?? 1) == 1)
+          .map((product) {
+            final warehouse = _webWarehouseMemoryDb.firstWhere(
+              (w) =>
+                  w['WarehouseID'].toString() ==
+                  product[_productWarehouseIdColumnName]?.toString(),
+              orElse: () => {},
+            );
+            final result = Map<String, dynamic>.from(product);
+            if (warehouse.isNotEmpty)
+              result['WarehouseName'] = warehouse['WarehouseName'];
+            return result;
+          })
+          .toList();
     }
     final db = await database;
     if (db == null) return [];
@@ -438,17 +550,29 @@ class DatabaseService {
       SELECT p.*, w.$_warehouseNameColumnName
       FROM $_productTableName p
       LEFT JOIN $_warehouseTableName w ON p.$_productWarehouseIdColumnName = w.$_warehouseIdColumnName
+      WHERE p.$_productIsActiveColumnName = 1
     ''');
   }
 
   Future<int> deleteProduct(String id) async {
     if (kIsWeb) {
-      _webMemoryDb.removeWhere((p) => p[_productIdColumnName] == id);
-      return 1;
+      final index = _webMemoryDb.indexWhere(
+        (p) => p[_productIdColumnName] == id,
+      );
+      if (index != -1) {
+        _webMemoryDb[index][_productIsActiveColumnName] = 0;
+        return 1;
+      }
+      return 0;
     }
     final db = await database;
     if (db == null) return 0;
-    return await db.delete(_productTableName, where: '$_productIdColumnName = ?', whereArgs: [id]);
+    return await db.update(
+      _productTableName,
+      {_productIsActiveColumnName: 0},
+      where: '$_productIdColumnName = ?',
+      whereArgs: [id],
+    );
   }
 
   Future<int> updateProduct({
@@ -471,7 +595,9 @@ class DatabaseService {
       _productWarehouseIdColumnName: warehouseId,
     };
     if (kIsWeb) {
-      final index = _webMemoryDb.indexWhere((p) => p[_productIdColumnName] == id);
+      final index = _webMemoryDb.indexWhere(
+        (p) => p[_productIdColumnName] == id,
+      );
       if (index != -1) {
         final updatedData = Map<String, dynamic>.from(data);
         updatedData[_productIdColumnName] = id;
@@ -482,15 +608,20 @@ class DatabaseService {
     }
     final db = await database;
     if (db == null) return 0;
-    return await db.update(_productTableName, data, where: '$_productIdColumnName = ?', whereArgs: [id]);
+    return await db.update(
+      _productTableName,
+      data,
+      where: '$_productIdColumnName = ?',
+      whereArgs: [id],
+    );
   }
 
   // --- SaleOrder, OrderDetail & Payment Methods ---
   Future<String> saveOrder({
     required String date,
     required double totalAmount,
-    required String paymentStatus, 
-    required String paymentType, 
+    required String paymentStatus,
+    required String paymentType,
     required List<Map<String, dynamic>> items,
     String? customerName,
     String? phone,
@@ -530,7 +661,9 @@ class DatabaseService {
         where: '$_paymentTypeNameColumnName = ?',
         whereArgs: [paymentType],
       );
-      String paymentId = pTypes.isNotEmpty ? pTypes.first[_paymentIdColumnName] : "PAY1";
+      String paymentId = pTypes.isNotEmpty
+          ? pTypes.first[_paymentIdColumnName]
+          : "PAY1";
 
       await txn.insert(_saleOrderTableName, {
         _orderIdColumnName: orderId,
@@ -548,9 +681,12 @@ class DatabaseService {
           _detailUnitPriceColumnName: item['UnitPrice'],
           _detailQuantityColumnName: item['Quantity'],
         });
-        await txn.execute('''
+        await txn.execute(
+          '''
           UPDATE $_productTableName SET $_productTotalUnitColumnName = $_productTotalUnitColumnName - ? WHERE $_productIdColumnName = ?
-        ''', [item['Quantity'], item['ProductID']]);
+        ''',
+          [item['Quantity'], item['ProductID']],
+        );
       }
 
       // บันทึกลูกหนี้ ถ้าเป็น "ค้างชำระ"
@@ -561,8 +697,8 @@ class DatabaseService {
           _orderIdColumnName: orderId,
           _debtStatusColumnName: 'Pending',
           _debtRecordStatusColumnName: 'Confirmed',
-          _debtOriginalAmountColumnName: totalAmount, 
-          _debtRemainingAmountColumnName: totalAmount, 
+          _debtOriginalAmountColumnName: totalAmount,
+          _debtRemainingAmountColumnName: totalAmount,
           _debtStartDateColumnName: date,
           _debtCustomerNameColumnName: customerName,
           _debtPhoneColumnName: phone,
@@ -576,7 +712,10 @@ class DatabaseService {
   Future<List<Map<String, dynamic>>> getOrders() async {
     if (kIsWeb) {
       return _webSaleOrderDb.map((order) {
-        final payment = _webPaymentTypeDb.firstWhere((p) => p['PaymentID'] == order['PaymentID'], orElse: () => {});
+        final payment = _webPaymentTypeDb.firstWhere(
+          (p) => p['PaymentID'] == order['PaymentID'],
+          orElse: () => {},
+        );
         return {...order, 'TypeName': payment['TypeName'] ?? 'ไม่ระบุ'};
       }).toList();
     }
@@ -592,20 +731,28 @@ class DatabaseService {
 
   Future<List<Map<String, dynamic>>> getOrderDetails(String orderId) async {
     if (kIsWeb) {
-      final details = _webOrderDetailDb.where((d) => d['OrderID'] == orderId).toList();
+      final details = _webOrderDetailDb
+          .where((d) => d['OrderID'] == orderId)
+          .toList();
       return details.map((d) {
-        final product = _webMemoryDb.firstWhere((p) => p['ProductID'] == d['ProductID'], orElse: () => {});
+        final product = _webMemoryDb.firstWhere(
+          (p) => p['ProductID'] == d['ProductID'],
+          orElse: () => {},
+        );
         return {...d, 'ProductName': product['ProductName'] ?? 'Unknown'};
       }).toList();
     }
     final db = await database;
     if (db == null) return [];
-    return await db.rawQuery('''
+    return await db.rawQuery(
+      '''
       SELECT d.*, p.$_productNameColumnName, p.$_productUnitColumnName
       FROM $_orderDetailTableName d
       JOIN $_productTableName p ON d.$_productIdColumnName = p.$_productIdColumnName
       WHERE d.$_orderIdColumnName = ?
-    ''', [orderId]);
+    ''',
+      [orderId],
+    );
   }
 
   Future<bool> cancelOrder(String orderId) async {
@@ -615,7 +762,9 @@ class DatabaseService {
         _webSaleOrderDb[index]['OrderStatus'] = 'Cancelled';
         final details = _webOrderDetailDb.where((d) => d['OrderID'] == orderId);
         for (var d in details) {
-          final pIndex = _webMemoryDb.indexWhere((p) => p['ProductID'] == d['ProductID']);
+          final pIndex = _webMemoryDb.indexWhere(
+            (p) => p['ProductID'] == d['ProductID'],
+          );
           if (pIndex != -1) {
             _webMemoryDb[pIndex]['TotalUnit'] += d['Quantity'];
           }
@@ -659,11 +808,14 @@ class DatabaseService {
       );
 
       for (var item in details) {
-        await txn.execute('''
+        await txn.execute(
+          '''
           UPDATE $_productTableName 
           SET $_productTotalUnitColumnName = $_productTotalUnitColumnName + ? 
           WHERE $_productIdColumnName = ?
-        ''', [item['Quantity'], item['ProductID']]);
+        ''',
+          [item['Quantity'], item['ProductID']],
+        );
       }
 
       return true;
@@ -697,9 +849,9 @@ class DatabaseService {
         _poIdColumnName: poId,
         _poReceiveDateColumnName: receiveDate,
         _poTotalCostColumnName: totalCost,
-        _poPaidAmountColumnName: paymentStatus == 'Paid' ? totalCost : 0, 
+        _poPaidAmountColumnName: paymentStatus == 'Paid' ? totalCost : 0,
         _poBillImagePathColumnName: billImagePath,
-        _poStatusColumnName: 'Confirmed', 
+        _poStatusColumnName: 'Confirmed',
         _poPaymentStatusColumnName: paymentStatus,
         _poTypeIdColumnName: ptId,
         _poSupplierIdColumnName: supplierId,
@@ -712,9 +864,12 @@ class DatabaseService {
           _detailUnitPriceColumnName: item['UnitPrice'],
           _detailQuantityColumnName: item['Quantity'],
         });
-        await txn.execute('''
+        await txn.execute(
+          '''
           UPDATE $_productTableName SET $_productTotalUnitColumnName = $_productTotalUnitColumnName + ? WHERE $_productIdColumnName = ?
-        ''', [item['Quantity'], item['ProductID']]);
+        ''',
+          [item['Quantity'], item['ProductID']],
+        );
       }
       return poId;
     });
@@ -747,11 +902,14 @@ class DatabaseService {
       );
 
       for (var item in details) {
-        await txn.execute('''
+        await txn.execute(
+          '''
           UPDATE $_productTableName 
           SET $_productTotalUnitColumnName = $_productTotalUnitColumnName - ? 
           WHERE $_productIdColumnName = ?
-        ''', [item['Quantity'], item['ProductID']]);
+        ''',
+          [item['Quantity'], item['ProductID']],
+        );
       }
 
       return true;
@@ -782,7 +940,8 @@ class DatabaseService {
         _cphPaidImagePathColumnName: imagePath,
       });
 
-      final double currentPaid = (po[_poPaidAmountColumnName] as num).toDouble();
+      final double currentPaid = (po[_poPaidAmountColumnName] as num)
+          .toDouble();
       final double totalCost = (po[_poTotalCostColumnName] as num).toDouble();
       final double newPaid = currentPaid + amount;
 
@@ -808,15 +967,17 @@ class DatabaseService {
   Future<bool> payPurchaseDebt(String poId) async {
     final db = await database;
     if (db == null) return false;
-    
+
     final poResults = await db.query(
       _purchaseOrderTableName,
       where: '$_poIdColumnName = ?',
       whereArgs: [poId],
     );
     if (poResults.isEmpty) return false;
-    final totalCost = (poResults.first[_poTotalCostColumnName] as num).toDouble();
-    final currentPaid = (poResults.first[_poPaidAmountColumnName] as num).toDouble();
+    final totalCost = (poResults.first[_poTotalCostColumnName] as num)
+        .toDouble();
+    final currentPaid = (poResults.first[_poPaidAmountColumnName] as num)
+        .toDouble();
     final balance = totalCost - currentPaid;
 
     if (balance <= 0) return true;
@@ -824,7 +985,9 @@ class DatabaseService {
     return await addPurchasePayment(poId: poId, amount: balance);
   }
 
-  Future<List<Map<String, dynamic>>> getPurchasePaymentHistory(String poId) async {
+  Future<List<Map<String, dynamic>>> getPurchasePaymentHistory(
+    String poId,
+  ) async {
     final db = await database;
     if (db == null) return [];
     return await db.query(
@@ -886,7 +1049,8 @@ class DatabaseService {
       });
 
       // 3. อัปเดตยอดคงเหลือใน DebtRecord
-      final double currentRemaining = (debt[_debtRemainingAmountColumnName] as num).toDouble();
+      final double currentRemaining =
+          (debt[_debtRemainingAmountColumnName] as num).toDouble();
       final double newRemaining = currentRemaining - amount;
 
       final Map<String, dynamic> updateData = {
@@ -896,7 +1060,7 @@ class DatabaseService {
       // 4. ถ้าจ่ายครบ (หรือเกิน) ให้เปลี่ยน DeptStatus เป็น Paid
       if (newRemaining <= 0) {
         updateData[_debtStatusColumnName] = 'Paid';
-        
+
         // อัปเดตสถานะใน SaleOrder หลักด้วย
         await txn.update(
           _saleOrderTableName,
@@ -917,7 +1081,9 @@ class DatabaseService {
     });
   }
 
-  Future<List<Map<String, dynamic>>> getDebtPaymentHistory(String debtId) async {
+  Future<List<Map<String, dynamic>>> getDebtPaymentHistory(
+    String debtId,
+  ) async {
     final db = await database;
     if (db == null) return [];
     return await db.query(
@@ -928,27 +1094,19 @@ class DatabaseService {
     );
   }
 
-  Future<List<Map<String, dynamic>>> getPurchaseOrderDetails(String poId) async {
+  Future<List<Map<String, dynamic>>> getPurchaseOrderDetails(
+    String poId,
+  ) async {
     final db = await database;
     if (db == null) return [];
-    return await db.rawQuery('''
+    return await db.rawQuery(
+      '''
       SELECT d.*, p.$_productNameColumnName, p.$_productUnitColumnName
       FROM $_purchaseDetailTableName d
       JOIN $_productTableName p ON d.$_productIdColumnName = p.$_productIdColumnName
       WHERE d.$_poIdColumnName = ?
-    ''', [poId]);
-  }
-
-  Future<void> printAllProducts() async {
-    final products = await getProducts();
-    print('==================== DATABASE CONTENT (Platform: ${kIsWeb ? 'Web' : 'Native'}) ====================');
-    if (products.isEmpty) {
-      print('ฐานข้อมูลว่างเปล่า (Empty)');
-    } else {
-      for (var p in products) {
-        print('ID: ${p[_productIdColumnName]} | ชื่อ: ${p[_productNameColumnName]} | ราคา: ${p[_productPriceColumnName]} | สต็อก: ${p[_productTotalUnitColumnName]} | คลัง: ${p[_warehouseNameColumnName] ?? 'ไม่มี'}');
-      }
-    }
-    print('==========================================================');
+    ''',
+      [poId],
+    );
   }
 }

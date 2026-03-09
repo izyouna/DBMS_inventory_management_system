@@ -61,6 +61,16 @@ class PurchaseOrderProvider with ChangeNotifier {
     await loadSuppliers();
   }
 
+  Future<void> updateSupplier(String id, String name, String phone) async {
+    await DatabaseService.instance.updateSupplier(id: id, name: name, phone: phone);
+    await loadSuppliers();
+  }
+
+  Future<void> deleteSupplier(String id) async {
+    await DatabaseService.instance.deleteSupplier(id);
+    await loadSuppliers();
+  }
+
   Future<void> loadPurchaseHistory() async {
     try {
       _purchaseHistory = await DatabaseService.instance.getPurchaseOrders();
