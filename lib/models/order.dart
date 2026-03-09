@@ -28,6 +28,15 @@ class Order {
 
   // แปลงจาก Map (Database) มาเป็น Order Object (รองรับโครงสร้าง v8)
   factory Order.fromMap(Map<String, dynamic> map, List<CartItem> items) {
+    Customer? customer;
+    if (map['CustomerName'] != null) {
+      customer = Customer(
+        id: '', // ไม่ได้ใช้ id สำหรับกรณีนี้
+        name: map['CustomerName'],
+        phone: map['Phone'] ?? '',
+      );
+    }
+
     return Order(
       id: map['OrderID'].toString(),
       items: items,
@@ -38,7 +47,7 @@ class Order {
       documentType: map['PaymentStatus'] == 'ค้างชำระ' ? DocumentType.invoice : DocumentType.receipt,
       isPaid: map['PaymentStatus'] != 'ค้างชำระ',
       orderStatus: map['OrderStatus'] ?? 'Confirmed',
-      customer: null, 
+      customer: customer, 
     );
   }
 }

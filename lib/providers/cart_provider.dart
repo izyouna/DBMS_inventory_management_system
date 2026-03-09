@@ -110,11 +110,22 @@ class CartProvider with ChangeNotifier {
       phone: customer?.phone,
     );
 
-    // 2. รีโหลดประวัติบิลและลูกหนี้จาก Database
+    // 2. สร้าง Order object สำหรับส่งกลับ (เพื่อให้มีรายการสินค้าครบถ้วนสำหรับปริ้น)
+    final completedOrder = Order(
+      id: orderId,
+      items: _items.values.toList(),
+      totalAmount: totalAmount,
+      dateTime: now,
+      paymentMethod: paymentType,
+      documentType: method is CreditPayment ? DocumentType.invoice : DocumentType.receipt,
+      isPaid: method is! CreditPayment,
+      customer: customer,
+    );
+
+    // 3. รีโหลดประวัติบิลและลูกหนี้จาก Database
     await loadOrdersFromDatabase();
     await loadDebtRecords();
     
-    final completedOrder = _orders.firstWhere((o) => o.id == orderId);
     clearCart();
     notifyListeners();
     return completedOrder;

@@ -722,9 +722,10 @@ class DatabaseService {
     final db = await database;
     if (db == null) return [];
     return await db.rawQuery('''
-      SELECT o.*, p.$_paymentTypeNameColumnName
+      SELECT o.*, p.$_paymentTypeNameColumnName, d.$_debtCustomerNameColumnName, d.$_debtPhoneColumnName
       FROM $_saleOrderTableName o
       LEFT JOIN $_paymentTypeTableName p ON o.$_orderPaymentIdColumnName = p.$_paymentIdColumnName
+      LEFT JOIN $_debtRecordTableName d ON o.$_orderIdColumnName = d.$_orderIdColumnName
       ORDER BY o.$_orderDateColumnName DESC
     ''');
   }
