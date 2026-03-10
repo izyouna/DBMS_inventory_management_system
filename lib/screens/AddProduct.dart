@@ -248,6 +248,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
                                 validator: (v) =>
                                     (v == null || int.tryParse(v) == null)
                                     ? 'ระบุตัวเลข'
+                                    : (int.tryParse(v) != null && int.parse(v) < 0)
+                                    ? 'จำนวนต้องไม่เป็นลบ'
                                     : null,
                               ),
                             ),
@@ -258,8 +260,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
                                 keyboardType: TextInputType.number,
                                 decoration: _inputDecoration('ราคาขาย'),
                                 validator: (v) =>
-                                    (v == null || double.tryParse(v) == null)
+                                    (v == null || int.tryParse(v) == null)
                                     ? 'ระบุตัวเลข'
+                                    : (int.tryParse(v) != null && int.parse(v) < 0)
+                                    ? 'จำนวนต้องไม่เป็นลบ'
                                     : null,
                               ),
                             ),

@@ -10,14 +10,14 @@ class SettingScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = [
-      {'icon': Icons.storefront, 'title': 'ข้อมูลร้านค้า'},
-      {'icon': Icons.receipt_long, 'title': 'รูปแบบใบเสร็จ'},
+      // {'icon': Icons.storefront, 'title': 'ข้อมูลร้านค้า'},
+      // {'icon': Icons.receipt_long, 'title': 'รูปแบบใบเสร็จ'},
       {'icon': Icons.inventory_2, 'title': 'ใบสั่งซื้อ'},
       {'icon': Icons.history, 'title': 'ประวัติใบสั่งซื้อ'},
       {'icon': Icons.business, 'title': 'ผู้จัดจำหน่าย'},
-      {'icon': Icons.payments_outlined, 'title': 'ช่องทางการชำระเงิน'},
-      {'icon': Icons.account_circle_outlined, 'title': 'ผู้ใช้งานระบบ'},
-      {'icon': Icons.lock_outline, 'title': 'ความปลอดภัย'},
+      // {'icon': Icons.payments_outlined, 'title': 'ช่องทางการชำระเงิน'},
+      // {'icon': Icons.account_circle_outlined, 'title': 'ผู้ใช้งานระบบ'},
+      // {'icon': Icons.lock_outline, 'title': 'ความปลอดภัย'},
     ];
 
     return Scaffold(

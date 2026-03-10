@@ -28,7 +28,7 @@ class Product {
     this.imagePath,
   });
 
-  bool get isLowStock => stock <= 3;
+  bool get isLowStock => stock <= 5;
 
   Map<String, dynamic> toMap() {
     return {
