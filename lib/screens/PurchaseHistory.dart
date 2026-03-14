@@ -32,8 +32,8 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
     
     final filteredHistory = poProvider.purchaseHistory.where((po) {
       if (_selectedFilter == 'ทั้งหมด') return true;
-      if (_selectedFilter == 'เงินสด') return po['PTName'] == 'เงินสด';
-      if (_selectedFilter == 'ค้างชำระ') return po['PTName'] == 'ค้างชำระ (เครดิต)';
+      if (_selectedFilter == 'เงินสด') return po['PTID'] == 'PT1';
+      if (_selectedFilter == 'ค้างชำระ') return po['PTID'] == 'PT2';
       return true;
     }).toList();
 
@@ -141,9 +141,9 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
                                 'วันที่: ${date.toString().split('.')[0]}',
                                 style: GoogleFonts.prompt(fontSize: 12),
                               ),
-                              if (po['SupplierName'] != null)
+                              if (po['supplier'] != null)
                                 Text(
-                                  'ผู้จัดจำหน่าย: ${po['SupplierName']}',
+                                  'ผู้จัดจำหน่าย: ${po['supplier']['Supplier_Name']}',
                                   style: GoogleFonts.prompt(fontSize: 11, color: Colors.blueGrey),
                                 ),
                               Text(
@@ -238,8 +238,8 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
               ],
             ),
             Text(po['POID'], style: GoogleFonts.prompt(fontSize: 14, color: Colors.grey)),
-            if (po['SupplierName'] != null)
-              Text('ผู้จัดจำหน่าย: ${po['SupplierName']}', style: GoogleFonts.prompt(fontSize: 12, color: Colors.blueGrey)),
+            if (po['supplier'] != null)
+              Text('ผู้จัดจำหน่าย: ${po['supplier']['Supplier_Name']}', style: GoogleFonts.prompt(fontSize: 12, color: Colors.blueGrey)),
             Text('ประเภทการชำระ: ${po['PTName'] ?? '-'}', style: GoogleFonts.prompt(fontSize: 12, color: Colors.blueGrey)),
           ],
         ),
@@ -299,7 +299,12 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
                   Text('หลักฐานใบเสร็จ / บิล', style: GoogleFonts.prompt(fontWeight: FontWeight.w600, fontSize: 14)),
                   const SizedBox(height: 8),
                   GestureDetector(
-                    onTap: () => _showFullScreenImage(context, po['BillImagePath']),
+                    onTap: () async {
+                      final url = await DatabaseService.instance.getSignedUrl(po['BillImagePath']);
+                      if (context.mounted && url != null) {
+                        _showFullScreenImage(context, url);
+                      }
+                    },
                     child: Container(
                       height: 100,
                       width: double.infinity,
@@ -309,9 +314,17 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(12),
-                        child: kIsWeb
+                        child: po['BillImagePath'].startsWith('http') || kIsWeb
                             ? Image.network(po['BillImagePath'], fit: BoxFit.cover)
-                            : Image.file(File(po['BillImagePath']), fit: BoxFit.cover),
+                            : FutureBuilder<String?>(
+                                future: DatabaseService.instance.getSignedUrl(po['BillImagePath']),
+                                builder: (context, snapshot) {
+                                  if (snapshot.hasData) {
+                                    return Image.network(snapshot.data!, fit: BoxFit.cover);
+                                  }
+                                  return const Center(child: CircularProgressIndicator());
+                                },
+                              ),
                       ),
                     ),
                   ),
@@ -347,7 +360,12 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
                             if (pay['PaidImagePath'] != null)
                               IconButton(
                                 icon: const Icon(Icons.image_outlined, size: 20, color: Colors.blue),
-                                onPressed: () => _showFullScreenImage(context, pay['PaidImagePath']),
+                                onPressed: () async {
+                                  final url = await DatabaseService.instance.getSignedUrl(pay['PaidImagePath']);
+                                  if (context.mounted && url != null) {
+                                    _showFullScreenImage(context, url);
+                                  }
+                                },
                               ),
                           ],
                         ),

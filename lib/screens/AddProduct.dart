@@ -81,15 +81,19 @@ class _AddProductScreenState extends State<AddProductScreen> {
       final name = _nameController.text.trim();
       final stock = int.tryParse(_stockController.text.trim()) ?? 0;
       final price = double.tryParse(_priceController.text.trim()) ?? 0.0;
-      final imagePath = provider.productImage?.path;
+      
+      String? imageUrl;
+      if (provider.productImage != null) {
+        imageUrl = await DatabaseService.instance.uploadProductImage(provider.productImage!);
+      }
 
       final id = await DatabaseService.instance.addProduct(
         name: name,
         stock: stock,
         price: price,
-        unit: _selectedUnit!.label,
-        category: _selectedCategory!.label,
-        imagePath: imagePath,
+        unitId: _selectedUnit!.id,
+        categoryId: _selectedCategory!.id,
+        imagePath: imageUrl,
         warehouseId: _selectedWarehouse?.id,
       );
 
@@ -102,7 +106,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
         unit: _selectedUnit!,
         category: _selectedCategory!,
         warehouse: _selectedWarehouse,
-        imagePath: imagePath,
+        imagePath: imageUrl,
       );
 
       if (!mounted) return;

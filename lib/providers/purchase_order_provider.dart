@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import '../models/product.dart';
 import '../services/database_service.dart';
@@ -94,10 +95,17 @@ class PurchaseOrderProvider with ChangeNotifier {
     required double amount,
     String? imagePath,
   }) async {
+    String? uploadedPath;
+    if (imagePath != null && !imagePath.startsWith('http')) {
+      uploadedPath = await DatabaseService.instance.uploadBillImage(File(imagePath));
+    } else {
+      uploadedPath = imagePath;
+    }
+
     final success = await DatabaseService.instance.addPurchasePayment(
       poId: poId,
       amount: amount,
-      imagePath: imagePath,
+      imagePath: uploadedPath,
     );
     if (success) {
       await loadPurchaseHistory();

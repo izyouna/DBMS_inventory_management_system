@@ -4,7 +4,14 @@ class ProductCategory {
 
   ProductCategory({required this.id, required this.label});
 
-  Map<String, dynamic> toMap() => {'id': id, 'label': label};
+  Map<String, dynamic> toMap() => {
+    'categoryid': id,
+    'categoryname': label,
+  };
+
   factory ProductCategory.fromMap(Map<String, dynamic> map) => 
-      ProductCategory(id: map['id'], label: map['label']);
+      ProductCategory(
+        id: (map['categoryid'] ?? map['CategoryID'] ?? map['id'] ?? '')?.toString() ?? '', 
+        label: map['categoryname'] ?? map['CategoryName'] ?? map['label'] ?? ''
+      );
 }

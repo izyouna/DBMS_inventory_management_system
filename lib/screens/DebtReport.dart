@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
 import '../providers/purchase_order_provider.dart';
+import '../services/database_service.dart';
 
 class DebtReportScreen extends StatefulWidget {
   const DebtReportScreen({super.key});
@@ -64,7 +65,7 @@ class DebtorListView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cartProvider = Provider.of<CartProvider>(context);
-    final debtRecords = cartProvider.debtRecords.where((d) => d['DeptStatus'] == 'Pending').toList();
+    final debtRecords = cartProvider.debtRecords.where((d) => d['DebtStatus'] == 'Pending').toList();
 
     // จัดเรียงตามชื่อ CustomerName (ก-ฮ, A-Z)
     debtRecords.sort((a, b) {
@@ -292,7 +293,12 @@ class DebtorListView extends StatelessWidget {
                           trailing: item['DeptPaidImagePath'] != null
                               ? IconButton(
                                   icon: const Icon(Icons.image_outlined, color: Colors.blue),
-                                  onPressed: () => _showFullScreenImage(context, item['DeptPaidImagePath']),
+                                  onPressed: () async {
+                                    final url = await DatabaseService.instance.getSignedUrl(item['DeptPaidImagePath']);
+                                    if (context.mounted && url != null) {
+                                      _showFullScreenImage(context, url);
+                                    }
+                                  },
                                 )
                               : null,
                         );
@@ -577,7 +583,12 @@ class CreditorListView extends StatelessWidget {
                           trailing: item['PaidImagePath'] != null
                               ? IconButton(
                                   icon: const Icon(Icons.image_outlined, color: Colors.blue),
-                                  onPressed: () => _showFullScreenImage(context, item['PaidImagePath']),
+                                  onPressed: () async {
+                                    final url = await DatabaseService.instance.getSignedUrl(item['PaidImagePath']);
+                                    if (context.mounted && url != null) {
+                                      _showFullScreenImage(context, url);
+                                    }
+                                  },
                                 )
                               : null,
                         );
@@ -598,7 +609,11 @@ class CreditorListView extends StatelessWidget {
         child: Stack(
           alignment: Alignment.center,
           children: [
-            InteractiveViewer(child: Image.file(File(imagePath))),
+            InteractiveViewer(
+              child: imagePath.startsWith('http')
+                  ? Image.network(imagePath)
+                  : Image.file(File(imagePath)),
+            ),
             Positioned(
               top: 0, 
               right: 0, 

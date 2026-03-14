@@ -11,17 +11,17 @@ class Customer {
 
   Map<String, dynamic> toMap() {
     return {
-      'id': id,
-      'name': name,
-      'phone': phone,
+      'customerid': id,
+      'customername': name,
+      'customerphone': phone,
     };
   }
 
   factory Customer.fromMap(Map<String, dynamic> map) {
     return Customer(
-      id: map['id'],
-      name: map['name'],
-      phone: map['phone'],
+      id: (map['customerid'] ?? map['CustomerID'] ?? map['id'])?.toString() ?? '',
+      name: map['customername'] ?? map['CustomerName'] ?? map['name'] ?? '',
+      phone: map['customerphone'] ?? map['CustomerPhone'] ?? map['phone'] ?? '',
     );
   }
 }

@@ -32,46 +32,62 @@ class Product {
 
   Map<String, dynamic> toMap() {
     return {
-      'ProductID': id,
-      'ProductName': name,
-      'TotalUnit': stock,
-      'Price': price,
-      'Category': category.label,
-      'Unit': unit.label,
-      'WarehouseID': warehouse?.id,
-      'ImagePath': imagePath,
+      'productid': id,
+      'productname': name,
+      'totalunit': stock,
+      'price': price,
+      'categoryid': category.id, 
+      'unitid': unit.id,
+      'warehouseid': warehouse?.id,
+      'productimagepath': imagePath, 
     };
   }
 
   factory Product.fromMap(Map<String, dynamic> map, List<ProductCategory> categories, List<ProductUnit> units) {
-    String categoryLabel = map['Category'] ?? '';
-    String unitLabel = map['Unit'] ?? '';
+    String categoryId = (map['categoryid'] ?? map['CategoryID'])?.toString() ?? '';
+    String unitId = (map['unitid'] ?? map['UnitID'])?.toString() ?? '';
 
-    // ค้นหา Category และ Unit ที่มี Label ตรงกันเพื่อเอา ID จริงมาใช้
+    // ค้นหา Category
     ProductCategory category = categories.firstWhere(
-      (c) => c.label == categoryLabel,
-      orElse: () => ProductCategory(id: '', label: categoryLabel),
+      (c) => c.id == categoryId,
+      orElse: () {
+        final categoryMap = map['category'] ?? map['Category'];
+        if (categoryMap != null && (categoryMap['categoryname'] ?? categoryMap['CategoryName']) != null) {
+          return ProductCategory(id: categoryId, label: categoryMap['categoryname'] ?? categoryMap['CategoryName']);
+        }
+        return ProductCategory(id: categoryId, label: 'ไม่ระบุหมวดหมู่');
+      },
     );
 
+    // ค้นหา Unit
     ProductUnit unit = units.firstWhere(
-      (u) => u.label == unitLabel,
-      orElse: () => ProductUnit(id: '', label: unitLabel),
+      (u) => u.id == unitId,
+      orElse: () {
+        final unitMap = map['productunit'] ?? map['ProductUnit'];
+        if (unitMap != null && (unitMap['unitname'] ?? unitMap['UnitName']) != null) {
+          return ProductUnit(id: unitId, label: unitMap['unitname'] ?? unitMap['UnitName']);
+        }
+        return ProductUnit(id: unitId, label: 'ไม่ระบุหน่วย');
+      },
     );
+
+    final warehouseId = map['warehouseid'] ?? map['WarehouseID'];
+    final warehouseMap = map['warehouse'] ?? map['Warehouse'];
 
     return Product(
-      id: map['ProductID']?.toString() ?? '',
-      name: map['ProductName'] ?? '',
-      stock: map['TotalUnit'] ?? 0,
-      price: (map['Price'] ?? 0).toDouble(),
+      id: (map['productid'] ?? map['ProductID'])?.toString() ?? '',
+      name: map['productname'] ?? map['ProductName'] ?? '',
+      stock: (map['totalunit'] ?? map['TotalUnit'] ?? 0).toInt(),
+      price: (map['price'] ?? map['Price'] ?? 0).toDouble(),
       unit: unit,
       category: category,
-      warehouse: map['WarehouseID'] != null
+      warehouse: warehouseId != null
           ? Warehouse(
-              id: map['WarehouseID'].toString(),
-              name: map['WarehouseName'] ?? 'ไม่ระบุคลัง',
+              id: warehouseId.toString(),
+              name: warehouseMap != null ? (warehouseMap['warehousename'] ?? warehouseMap['WarehouseName']) : 'ไม่ระบุคลัง',
             )
           : null,
-      imagePath: map['ImagePath'],
+      imagePath: map['productimagepath'] ?? map['ProductImagePath'],
     );
   }
 }

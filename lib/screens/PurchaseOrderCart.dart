@@ -122,8 +122,8 @@ class _PurchaseOrderCartScreenState extends State<PurchaseOrderCartScreen> {
                   ),
                   ...poProvider.suppliers.map((s) {
                     return DropdownMenuItem<String>(
-                      value: s['SupplierID'],
-                      child: Text(s['SupplierName'], style: GoogleFonts.prompt()),
+                      value: s['Supplier_ID'],
+                      child: Text(s['Supplier_Name'], style: GoogleFonts.prompt()),
                     );
                   }).toList(),
                 ],
@@ -465,19 +465,24 @@ class _PurchaseOrderCartScreenState extends State<PurchaseOrderCartScreen> {
                   };
                 }).toList();
 
-                // 2. บันทึกลงตาราง PurchaseOrder และ PurchaseDetail
-                // และอัปเดตสต็อกในฐานข้อมูล (จัดการใน DatabaseService.savePurchaseOrder)
+                // 2. Upload Bill Image if exists
+                String? billUrl;
+                if (_billImage != null) {
+                  billUrl = await DatabaseService.instance.uploadBillImage(_billImage!);
+                }
+
+                // 3. บันทึกลงตาราง PurchaseOrder และ PurchaseDetail
                 await DatabaseService.instance.savePurchaseOrder(
                   receiveDate: DateTime.now().toIso8601String(),
                   totalCost: po.totalAmount,
                   items: itemsToSave,
-                  billImagePath: _billImage?.path, // ส่งพาธรูปภาพบิล
-                  purchaseType: _paymentMethod == 'Cash' ? 'เงินสด' : 'ค้างชำระ (เครดิต)', // กำหนดประเภท
-                  paymentStatus: _paymentMethod == 'Cash' ? 'Paid' : 'Pending', // ส่งสถานะการชำระเงิน
+                  billImagePath: billUrl, 
+                  ptId: _paymentMethod == 'Cash' ? 'PT1' : 'PT2', 
+                  paymentStatus: _paymentMethod == 'Cash' ? 'Paid' : 'Pending', 
                   supplierId: poProvider.selectedSupplierId,
                 );
 
-                // 3. รีโหลดข้อมูลสินค้าใน Provider เพื่อให้ UI อัปเดตสต็อกล่าสุด
+                // 4. รีโหลดข้อมูลสินค้าใน Provider เพื่อให้ UI อัปเดตสต็อกล่าสุด
                 await productProvider.loadProductsFromDatabase();
                 await poProvider.loadPurchaseHistory();
 

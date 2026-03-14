@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../models/product.dart';
 import '../models/cart_item.dart';
@@ -56,16 +57,26 @@ class CartProvider with ChangeNotifier {
     try {
       final details = await DatabaseService.instance.getOrderDetails(orderId);
       return details.map((d) {
+        final productData = d['product'];
+        String unitLabel = 'ไม่ระบุหน่วย';
+        
+        if (productData != null && productData['productunit'] != null) {
+          unitLabel = productData['productunit']['unitname'] ?? productData['productunit']['UnitName'] ?? 'ไม่ระบุหน่วย';
+        }
+
         return CartItem(
           product: Product(
-            id: d['ProductID'] ?? '',
-            name: d['ProductName'] ?? 'ไม่พบชื่อสินค้า',
-            price: (d['UnitPrice'] ?? 0).toDouble(),
+            id: (productData != null ? (productData['productid'] ?? productData['ProductID']) : (d['productid'] ?? d['ProductID'] ?? '')).toString(),
+            name: productData != null ? (productData['productname'] ?? productData['ProductName'] ?? 'ไม่พบชื่อสินค้า') : (d['productname'] ?? d['ProductName'] ?? 'ไม่พบชื่อสินค้า'),
+            price: (d['unit_price'] ?? d['UnitPrice'] ?? 0).toDouble(),
             stock: 0, 
-            unit: ProductUnit(id: '', label: d['Unit'] ?? ''),
+            unit: ProductUnit(
+              id: (productData != null ? (productData['unitid'] ?? productData['UnitID']) : '').toString(), 
+              label: unitLabel
+            ),
             category: ProductCategory(id: '', label: ''),
           ),
-          quantity: d['Quantity'] ?? 0,
+          quantity: (d['quantity'] ?? d['Quantity'] ?? 0).toInt(),
         );
       }).toList();
     } catch (e) {
@@ -94,17 +105,22 @@ class CartProvider with ChangeNotifier {
     final paymentType = method.name; 
     
     final List<Map<String, dynamic>> dbItems = _items.values.map((item) => {
-      'ProductID': item.product.id,
-      'UnitPrice': item.product.price,
-      'Quantity': item.quantity,
+      'productid': item.product.id,
+      'unit_price': item.product.price,
+      'quantity': item.quantity,
     }).toList();
+
+    String? paymentId;
+    if (method is CashPayment) paymentId = 'PAY1';
+    else if (method is QRPayment) paymentId = 'PAY2';
+    else if (method is CreditPayment) paymentId = 'PAY3';
 
     // 1. บันทึกลง Database
     final orderId = await DatabaseService.instance.saveOrder(
       date: now.toIso8601String(),
       totalAmount: totalAmount,
       paymentStatus: method is CreditPayment ? 'ค้างชำระ' : 'ชำระแล้ว',
-      paymentType: paymentType,
+      paymentId: paymentId,
       items: dbItems,
       customerName: customer?.name,
       phone: customer?.phone,
@@ -166,10 +182,17 @@ class CartProvider with ChangeNotifier {
     required double amount,
     String? imagePath,
   }) async {
+    String? uploadedPath;
+    if (imagePath != null && !imagePath.startsWith('http')) {
+      uploadedPath = await DatabaseService.instance.uploadBillImage(File(imagePath));
+    } else {
+      uploadedPath = imagePath;
+    }
+
     final success = await DatabaseService.instance.addDebtPayment(
       debtId: debtId,
       amount: amount,
-      imagePath: imagePath,
+      imagePath: uploadedPath,
     );
     if (success) {
       await loadDebtRecords();

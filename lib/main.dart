@@ -1,17 +1,12 @@
-import 'dart:io';
-import 'package:flutter/foundation.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/material.dart';
 import 'package:inventory_management_system/screens/DebtReport.dart';
 import 'package:provider/provider.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
-
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'providers/product_provider.dart';
 import 'providers/cart_provider.dart';
-import 'providers/purchase_order_provider.dart'; // เพิ่ม import
-// import 'services/database_service.dart';
-// import 'screens/AddProduct.dart';
+import 'providers/purchase_order_provider.dart';
 import 'screens/Dashboard.dart';
 import 'screens/Store.dart';
 import 'screens/inventory.dart';
@@ -21,15 +16,14 @@ import 'screens/Setting.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // ตั้งค่าฐานข้อมูลให้รันได้ทุกที่ (Android, iOS, Windows, Web)
-  if (kIsWeb) {
-    // สำหรับ Web/Chrome
-    databaseFactory = databaseFactoryFfiWeb;
-  } else if (Platform.isWindows || Platform.isLinux) {
-    // สำหรับ Windows Desktop
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  }
+  // Load environment variables
+  await dotenv.load(fileName: ".env");
+
+  // Initialize Supabase
+  await Supabase.initialize(
+    url: dotenv.env['SUPABASE_URL'] ?? '',
+    anonKey: dotenv.env['SUPABASE_ANON_KEY'] ?? '',
+  );
 
   runApp(
     MultiProvider(
