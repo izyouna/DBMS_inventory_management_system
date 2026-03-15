@@ -12,6 +12,7 @@ class Product {
   String name;
   int stock;
   double price;
+  double markupPercentage; // เปอร์เซ็นต์กำไรที่ต้องการ
   ProductUnit unit;
   ProductCategory category;
   Warehouse? warehouse;
@@ -22,6 +23,7 @@ class Product {
     required this.name,
     required this.stock,
     required this.price,
+    this.markupPercentage = 0.0,
     required this.unit,
     required this.category,
     this.warehouse,
@@ -36,6 +38,7 @@ class Product {
       'productname': name,
       'totalunit': stock,
       'price': price,
+      'markup_percentage': markupPercentage,
       'categoryid': category.id, 
       'unitid': unit.id,
       'warehouseid': warehouse?.id,
@@ -44,16 +47,16 @@ class Product {
   }
 
   factory Product.fromMap(Map<String, dynamic> map, List<ProductCategory> categories, List<ProductUnit> units) {
-    String categoryId = (map['categoryid'] ?? map['CategoryID'])?.toString() ?? '';
-    String unitId = (map['unitid'] ?? map['UnitID'])?.toString() ?? '';
+    String categoryId = map['categoryid']?.toString() ?? '';
+    String unitId = map['unitid']?.toString() ?? '';
 
     // ค้นหา Category
     ProductCategory category = categories.firstWhere(
       (c) => c.id == categoryId,
       orElse: () {
-        final categoryMap = map['category'] ?? map['Category'];
-        if (categoryMap != null && (categoryMap['categoryname'] ?? categoryMap['CategoryName']) != null) {
-          return ProductCategory(id: categoryId, label: categoryMap['categoryname'] ?? categoryMap['CategoryName']);
+        final categoryMap = map['category'];
+        if (categoryMap != null && categoryMap['categoryname'] != null) {
+          return ProductCategory(id: categoryId, label: categoryMap['categoryname']);
         }
         return ProductCategory(id: categoryId, label: 'ไม่ระบุหมวดหมู่');
       },
@@ -63,31 +66,32 @@ class Product {
     ProductUnit unit = units.firstWhere(
       (u) => u.id == unitId,
       orElse: () {
-        final unitMap = map['productunit'] ?? map['ProductUnit'];
-        if (unitMap != null && (unitMap['unitname'] ?? unitMap['UnitName']) != null) {
-          return ProductUnit(id: unitId, label: unitMap['unitname'] ?? unitMap['UnitName']);
+        final unitMap = map['productunit'];
+        if (unitMap != null && unitMap['unitname'] != null) {
+          return ProductUnit(id: unitId, label: unitMap['unitname']);
         }
         return ProductUnit(id: unitId, label: 'ไม่ระบุหน่วย');
       },
     );
 
-    final warehouseId = map['warehouseid'] ?? map['WarehouseID'];
-    final warehouseMap = map['warehouse'] ?? map['Warehouse'];
+    final warehouseId = map['warehouseid'];
+    final warehouseMap = map['warehouse'];
 
     return Product(
-      id: (map['productid'] ?? map['ProductID'])?.toString() ?? '',
-      name: map['productname'] ?? map['ProductName'] ?? '',
-      stock: (map['totalunit'] ?? map['TotalUnit'] ?? 0).toInt(),
-      price: (map['price'] ?? map['Price'] ?? 0).toDouble(),
+      id: map['productid']?.toString() ?? '',
+      name: map['productname'] ?? '',
+      stock: (map['totalunit'] ?? 0).toInt(),
+      price: (map['price'] ?? 0).toDouble(),
+      markupPercentage: (map['markup_percentage'] ?? 0.0).toDouble(),
       unit: unit,
       category: category,
       warehouse: warehouseId != null
           ? Warehouse(
               id: warehouseId.toString(),
-              name: warehouseMap != null ? (warehouseMap['warehousename'] ?? warehouseMap['WarehouseName']) : 'ไม่ระบุคลัง',
+              name: warehouseMap != null ? warehouseMap['warehousename'] : 'ไม่ระบุคลัง',
             )
           : null,
-      imagePath: map['productimagepath'] ?? map['ProductImagePath'],
+      imagePath: map['productimagepath'],
     );
   }
 }

@@ -15,7 +15,6 @@ class DatabaseService {
     String prefix,
   ) async {
     final String col = idColumn.toLowerCase();
-    // In Supabase, we can fetch the latest ID to generate the next one
     final response = await _supabase
         .from(tableName)
         .select(col)
@@ -62,7 +61,6 @@ class DatabaseService {
       final Uint8List bytes = await _getFileBytes(file);
       await _supabase.storage.from('bills').uploadBinary(path, bytes);
 
-      // For private bucket, we store the path, not the public URL
       return path;
     } catch (e) {
       debugPrint('Error uploading bill image: $e');
@@ -73,16 +71,13 @@ class DatabaseService {
   Future<Uint8List> _getFileBytes(dynamic file) async {
     if (file is Uint8List) return file;
     if (file is File) return await file.readAsBytes();
-    // Assuming it's XFile from image_picker
     return await file.readAsBytes();
   }
 
   Future<String?> getSignedUrl(String path) async {
     if (path.isEmpty) return null;
     try {
-      return await _supabase.storage
-          .from('bills')
-          .createSignedUrl(path, 600); // 10 minutes
+      return await _supabase.storage.from('bills').createSignedUrl(path, 600);
     } catch (e) {
       debugPrint('Error getting signed URL: $e');
       return null;
@@ -136,6 +131,53 @@ class DatabaseService {
         .eq('supplier_id', id);
   }
 
+  // --- Customer Methods ---
+  Future<List<Map<String, dynamic>>> getCustomers() async {
+    return await _supabase
+        .from('customer')
+        .select()
+        .order('customername', ascending: true);
+  }
+
+  Future<Map<String, dynamic>?> getCustomerByPhone(String phone) async {
+    try {
+      final cleanPhone = phone.trim();
+      final response = await _supabase
+          .from('customer')
+          .select('*, debtrecord(remainingamount, debtstatus, debtrecordstatus)')
+          .eq('customerphone', cleanPhone)
+          .order('customerid', ascending: false)
+          .limit(1);
+
+      if (response == null || (response as List).isEmpty) return null;
+
+      final customer = response[0];
+      double totalDebt = 0;
+      if (customer['debtrecord'] != null) {
+        final List records = customer['debtrecord'] as List;
+        for (var dr in records) {
+          if (dr['debtstatus'] == 'Pending' && dr['debtrecordstatus'] == 'Confirmed') {
+            totalDebt += (dr['remainingamount'] as num).toDouble();
+          }
+        }
+      }
+
+      final Map<String, dynamic> result = Map<String, dynamic>.from(customer);
+      result['total_debt'] = totalDebt;
+      return result;
+    } catch (e) {
+      debugPrint('Error fetching customer by phone: $e');
+      return null;
+    }
+  }
+
+  Future<void> updateCustomerCreditLimit(int customerId, double limit) async {
+    await _supabase
+        .from('customer')
+        .update({'credit_limit': limit})
+        .eq('customerid', customerId);
+  }
+
   // --- Category Methods ---
   Future<String> addCategory(String name) async {
     final newId = await _generateCustomId('category', 'categoryid', 'C');
@@ -161,6 +203,7 @@ class DatabaseService {
     String? categoryId,
     required int stock,
     required double price,
+    double markupPercentage = 0.0,
     required String unitId,
     String? imagePath,
     String? warehouseId,
@@ -172,6 +215,7 @@ class DatabaseService {
       'categoryid': categoryId,
       'totalunit': stock,
       'price': price,
+      'markup_percentage': markupPercentage,
       'unitid': unitId,
       'productimagepath': imagePath,
       'warehouseid': warehouseId,
@@ -181,7 +225,6 @@ class DatabaseService {
   }
 
   Future<List<Map<String, dynamic>>> getProducts() async {
-    // Joining with warehouse, category and productunit
     return await _supabase
         .from('product')
         .select('''
@@ -206,6 +249,7 @@ class DatabaseService {
     String? categoryId,
     required int stock,
     required double price,
+    double markupPercentage = 0.0,
     required String unitId,
     String? imagePath,
     String? warehouseId,
@@ -217,6 +261,7 @@ class DatabaseService {
           'categoryid': categoryId,
           'totalunit': stock,
           'price': price,
+          'markup_percentage': markupPercentage,
           'unitid': unitId,
           'productimagepath': imagePath,
           'warehouseid': warehouseId,
@@ -233,64 +278,219 @@ class DatabaseService {
     required List<Map<String, dynamic>> items,
     String? customerName,
     String? phone,
+    String? dueDate,
+    double? creditLimit,
   }) async {
     final orderId = 'ORD-${DateTime.now().millisecondsSinceEpoch}';
-
-    // In Supabase, we don't have client-side transactions across multiple tables as easily as sqflite.
-    // For a robust solution, one would use a Postgres Function (RPC).
-    // Here we'll do sequential calls for simplicity, though it lacks atomicity.
-
-    await _supabase.from('saleorder').insert({
-      'order_id': orderId,
-      'orderdate': date,
-      'totalamount': totalAmount,
-      'paymentstatus': paymentStatus,
-      'status': 'Confirmed',
-      'paymentid': paymentId,
-    });
-
-    for (var item in items) {
-      await _supabase.from('orderdetail').insert({
+    
+    try {
+      await _supabase.from('saleorder').insert({
         'order_id': orderId,
-        'productid': item['productid'] ?? item['ProductID'],
-        'unit_price': item['unitprice'] ?? item['UnitPrice'],
-        'quantity': item['quantity'] ?? item['Quantity'],
+        'orderdate': date,
+        'totalamount': totalAmount,
+        'paymentstatus': paymentStatus,
+        'status': 'Confirmed',
+        'paymentid': paymentId,
       });
 
-      // Update stock
-      final productResponse = await _supabase
+      final List<String> productIds = items.map((e) => (e['productid'] ?? e['ProductID']).toString()).toList();
+      
+      final List<dynamic> allProducts = await _supabase
           .from('product')
-          .select('totalunit')
-          .eq('productid', item['productid'] ?? item['ProductID'])
-          .single();
+          .select('productid, totalunit')
+          .inFilter('productid', productIds);
 
-      final int currentStock = productResponse['totalunit'];
-      await _supabase
-          .from('product')
-          .update({
-            'totalunit':
-                currentStock -
-                (item['quantity'] ?? item['Quantity'] as num).toInt(),
-          })
-          .eq('productid', item['productid'] ?? item['ProductID']);
+      final List<dynamic> allBatches = await _supabase
+          .from('purchasedetail')
+          .select('*, purchaseorder(receivedate)')
+          .inFilter('productid', productIds)
+          .gt('quantity_remaining', 0)
+          .order('receivedate', referencedTable: 'purchaseorder', ascending: true);
+
+      List<Map<String, dynamic>> orderDetailsToInsert = [];
+      List<Map<String, dynamic>> stockTransactionsToInsert = [];
+
+      List<Map<String, dynamic>> batchUpdates = [];
+      List<Map<String, dynamic>> productUpdates = [];
+
+      for (var item in items) {
+        final String productId = (item['productid'] ?? item['ProductID']).toString();
+        final double qtyToSell = (item['quantity'] ?? item['Quantity'] as num).toDouble();
+        final double unitPrice = (item['unit_price'] ?? item['UnitPrice'] ?? item['unitprice'] ?? 0).toDouble();
+
+        if (qtyToSell <= 0) continue;
+
+        final productBatches = allBatches.where((b) => b['productid'] == productId).toList();
+        double remainingToExit = qtyToSell;
+        double totalCostForThisItem = 0;
+
+        for (var batch in productBatches) {
+          if (remainingToExit <= 0.0001) break;
+
+          double batchRemaining = (batch['quantity_remaining'] as num).toDouble();
+          double batchCostPrice = (batch['unitprice'] as num).toDouble();
+          double takeFromBatch = 0;
+
+          if (batchRemaining <= remainingToExit) {
+            takeFromBatch = batchRemaining;
+            remainingToExit -= batchRemaining;
+          } else {
+            takeFromBatch = remainingToExit;
+            remainingToExit = 0;
+          }
+
+          if (takeFromBatch > 0) {
+            // เตรียมข้อมูลสำหรับ Bulk Upsert ล็อตสินค้า
+            batchUpdates.add({
+              'poid': batch['poid'],
+              'productid': productId,
+              'quantity_remaining': batchRemaining - takeFromBatch,
+              'unitprice': batch['unitprice'], // ต้องส่งค่าเดิมกลับไปด้วยหากเป็น PK/Required
+            });
+            totalCostForThisItem += (takeFromBatch * batchCostPrice);
+          }
+        }
+
+        double finalCostPrice = (qtyToSell - remainingToExit) > 0
+            ? (totalCostForThisItem / (qtyToSell - remainingToExit))
+            : 0;
+
+        orderDetailsToInsert.add({
+          'order_id': orderId,
+          'productid': productId,
+          'unit_price': unitPrice,
+          'quantity': qtyToSell,
+          'cost_price': finalCostPrice,
+        });
+
+        final matches = allProducts.where((p) => p['productid'] == productId);
+        if (matches.isNotEmpty) {
+          final productInfo = matches.first;
+          final int currentStock = (productInfo['totalunit'] as num).toInt();
+          final int newStock = currentStock - qtyToSell.toInt();
+          
+          // เตรียมข้อมูลสำหรับ Bulk Upsert สต็อกรวม
+          productUpdates.add({
+            'productid': productId,
+            'totalunit': newStock,
+          });
+
+          stockTransactionsToInsert.add({
+            'transaction_id': 'TX-${DateTime.now().millisecondsSinceEpoch}-${productId}',
+            'productid': productId,
+            'type': 'OUT',
+            'quantity': qtyToSell,
+            'balance_after': newStock,
+            'cost_price': finalCostPrice,
+            'reference_id': orderId,
+            'created_at': DateTime.now().toIso8601String(),
+            'remarks': 'ขายสินค้าบิล $orderId (FIFO)',
+          });
+        }
+      }
+
+      // 4. บันทึกข้อมูลแบบ Bulk (ส่ง API เพียงไม่กี่ครั้ง)
+      final List<Future> dbOperations = [];
+      
+      if (orderDetailsToInsert.isNotEmpty) {
+        dbOperations.add(_supabase.from('orderdetail').insert(orderDetailsToInsert));
+      }
+      if (stockTransactionsToInsert.isNotEmpty) {
+        dbOperations.add(_supabase.from('stock_transaction').insert(stockTransactionsToInsert));
+      }
+      if (batchUpdates.isNotEmpty) {
+        // ใช้ upsert เพื่ออัปเดตหลายแถวในคำสั่งเดียว
+        dbOperations.add(_supabase.from('purchasedetail').upsert(batchUpdates));
+      }
+      if (productUpdates.isNotEmpty) {
+        dbOperations.add(_supabase.from('product').upsert(productUpdates));
+      }
+
+      await Future.wait(dbOperations).timeout(const Duration(seconds: 30));
+
+      // 5. จัดการข้อมูลลูกค้า (บันทึกทุกกรณีที่มีชื่อลูกค้า เพื่อเก็บเป็นฐานข้อมูล)
+      int? finalCustomerId;
+      if (customerName != null && customerName.isNotEmpty) {
+        final cleanPhone = phone?.trim() ?? '';
+        
+        Map<String, dynamic>? existing;
+        // ค้นหาลูกค้าเดิม (เฉพาะกรณีที่มีเบอร์โทรศัพท์เท่านั้น)
+        if (cleanPhone.isNotEmpty) {
+          final results = await _supabase
+              .from('customer')
+              .select('customerid')
+              .eq('customerphone', cleanPhone)
+              .limit(1);
+          
+          if (results != null && (results as List).isNotEmpty) {
+            existing = results[0];
+          }
+        }
+
+        if (existing != null) {
+          finalCustomerId = existing['customerid'];
+        } else {
+          try {
+            // ดึง ID สูงสุดมาบวก 1
+            final lastCustomer = await _supabase
+                .from('customer')
+                .select('customerid')
+                .order('customerid', ascending: false)
+                .limit(1)
+                .maybeSingle();
+            
+            int nextId;
+            if (lastCustomer != null) {
+              nextId = int.parse(lastCustomer['customerid'].toString()) + 1;
+            } else {
+              nextId = (DateTime.now().millisecondsSinceEpoch % 1000000) + 1000;
+            }
+
+            final newCustomer = await _supabase.from('customer').insert({
+              'customerid': nextId,
+              'customername': customerName,
+              'customerphone': cleanPhone,
+              'credit_limit': creditLimit ?? 0.0,
+            }).select('customerid').maybeSingle();
+            
+            finalCustomerId = newCustomer != null ? newCustomer['customerid'] : nextId;
+          } catch (e) {
+            debugPrint('Error creating customer: $e');
+            // กรณีสร้างไม่สำเร็จ (เช่น เบอร์ซ้ำที่ไม่ได้ตรวจเจอตอนแรก) ให้ลองหาด้วยเบอร์อีกครั้ง
+            if (cleanPhone.isNotEmpty) {
+              final retry = await _supabase
+                  .from('customer')
+                  .select('customerid')
+                  .eq('customerphone', cleanPhone)
+                  .maybeSingle();
+              finalCustomerId = retry?['customerid'];
+            }
+          }
+        }
+      }
+
+      // 6. จัดการข้อมูลหนี้สิน (เฉพาะกรณีขายเชื่อ)
+      if (paymentStatus == 'ขายเชื่อ (ค้างชำระ)' || paymentStatus == 'ค้างชำระ') {
+        // สร้างรหัสหนี้ที่สั้นลงและปลอดภัย
+        final debtId = 'D${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
+        await _supabase.from('debtrecord').insert({
+          'debtid': debtId,
+          'order_id': orderId,
+          'debtstatus': 'Pending',
+          'debtrecordstatus': 'Confirmed',
+          'originalamount': totalAmount,
+          'remainingamount': totalAmount,
+          'startdate': date,
+          'due_date': dueDate,
+          'customerid': finalCustomerId,
+        });
+      }
+
+      return orderId;
+    } catch (e) {
+      debugPrint('Error in saveOrder: $e');
+      rethrow;
     }
-
-    if (paymentStatus == 'ค้างชำระ') {
-      final debtId = 'DBT-${DateTime.now().millisecondsSinceEpoch}';
-      await _supabase.from('debtrecord').insert({
-        'debtid': debtId,
-        'order_id': orderId,
-        'debtstatus': 'Pending',
-        'debtrecordstatus': 'Confirmed',
-        'originalamount': totalAmount,
-        'remainingamount': totalAmount,
-        'startdate': date,
-        'customername': customerName,
-        'customerphone': phone,
-      });
-    }
-
-    return orderId;
   }
 
   Future<List<Map<String, dynamic>>> getOrders() async {
@@ -299,7 +499,10 @@ class DatabaseService {
         .select('''
       *,
       paymenttype (paymentname),
-      debtrecord (customername, customerphone)
+      debtrecord (
+        *,
+        customer (customername, customerphone)
+      )
     ''')
         .order('orderdate', ascending: false);
   }
@@ -327,19 +530,51 @@ class DatabaseService {
 
       final details = await getOrderDetails(orderId);
       for (var item in details) {
+        final String productId = item['productid'];
+        final double qty = (item['quantity'] as num).toDouble();
+
         final productResponse = await _supabase
             .from('product')
             .select('totalunit')
-            .eq('productid', item['productid'])
+            .eq('productid', productId)
             .single();
 
         final int currentStock = productResponse['totalunit'];
+        final int newStock = currentStock + qty.toInt();
+
         await _supabase
             .from('product')
-            .update({
-              'totalunit': currentStock + (item['quantity'] as num).toInt(),
-            })
-            .eq('productid', item['productid']);
+            .update({'totalunit': newStock})
+            .eq('productid', productId);
+
+        final latestBatch = await _supabase
+            .from('purchasedetail')
+            .select('poid, quantity_remaining')
+            .eq('productid', productId)
+            .order('poid', ascending: false)
+            .limit(1)
+            .maybeSingle();
+
+        if (latestBatch != null) {
+          double currentRemaining = (latestBatch['quantity_remaining'] as num)
+              .toDouble();
+          await _supabase
+              .from('purchasedetail')
+              .update({'quantity_remaining': currentRemaining + qty})
+              .eq('poid', latestBatch['poid'])
+              .eq('productid', productId);
+        }
+
+        await _supabase.from('stock_transaction').insert({
+          'transaction_id': 'TX-${DateTime.now().millisecondsSinceEpoch}',
+          'productid': productId,
+          'type': 'ADJ_IN',
+          'quantity': qty,
+          'balance_after': newStock,
+          'reference_id': orderId,
+          'created_at': DateTime.now().toIso8601String(),
+          'remarks': 'ยกเลิกบิลขาย $orderId (คืนสต็อกเข้าล็อตล่าสุด)',
+        });
       }
       return true;
     } catch (e) {
@@ -366,6 +601,7 @@ class DatabaseService {
     String? ptId,
     required String paymentStatus,
     String? supplierId,
+    String? dueDate,
   }) async {
     final poId = 'PO-${DateTime.now().millisecondsSinceEpoch}';
 
@@ -379,32 +615,49 @@ class DatabaseService {
       'paymentstatus': paymentStatus,
       'ptid': ptId,
       'supplier_id': supplierId,
+      'due_date': dueDate,
     });
 
     for (var item in items) {
+      final String productId = item['productid'] ?? item['ProductID'];
+      final double qty = (item['quantity'] ?? item['Quantity'] as num)
+          .toDouble();
+      final double unitPrice = (item['unitprice'] ?? item['UnitPrice'] ?? 0)
+          .toDouble();
+
       await _supabase.from('purchasedetail').insert({
         'poid': poId,
-        'productid': item['productid'] ?? item['ProductID'],
-        'unitprice': item['unitprice'] ?? item['UnitPrice'],
-        'quantity': item['quantity'] ?? item['Quantity'],
+        'productid': productId,
+        'unitprice': unitPrice,
+        'quantity': qty,
+        'quantity_remaining': qty,
       });
 
-      // Update stock
       final productResponse = await _supabase
           .from('product')
           .select('totalunit')
-          .eq('productid', item['productid'] ?? item['ProductID'])
+          .eq('productid', productId)
           .single();
 
       final int currentStock = productResponse['totalunit'];
+      final int newStock = currentStock + qty.toInt();
+
       await _supabase
           .from('product')
-          .update({
-            'totalunit':
-                currentStock +
-                (item['quantity'] ?? item['Quantity'] as num).toInt(),
-          })
-          .eq('productid', item['productid'] ?? item['ProductID']);
+          .update({'totalunit': newStock})
+          .eq('productid', productId);
+
+      await _supabase.from('stock_transaction').insert({
+        'transaction_id': 'TX-${DateTime.now().millisecondsSinceEpoch}',
+        'productid': productId,
+        'type': 'IN',
+        'quantity': qty,
+        'balance_after': newStock,
+        'cost_price': unitPrice,
+        'reference_id': poId,
+        'created_at': DateTime.now().toIso8601String(),
+        'remarks': 'ซื้อสินค้าเข้าบิล $poId',
+      });
     }
 
     return poId;
@@ -442,19 +695,39 @@ class DatabaseService {
 
       final details = await getPurchaseOrderDetails(poId);
       for (var item in details) {
+        final String productId = item['productid'];
+        final double qty = (item['quantity'] as num).toDouble();
+
         final productResponse = await _supabase
             .from('product')
             .select('totalunit')
-            .eq('productid', item['productid'])
+            .eq('productid', productId)
             .single();
 
         final int currentStock = productResponse['totalunit'];
+        final int newStock = currentStock - qty.toInt();
+
         await _supabase
             .from('product')
-            .update({
-              'totalunit': currentStock - (item['quantity'] as num).toInt(),
-            })
-            .eq('productid', item['productid']);
+            .update({'totalunit': newStock})
+            .eq('productid', productId);
+
+        await _supabase
+            .from('purchasedetail')
+            .update({'quantity_remaining': 0})
+            .eq('poid', poId)
+            .eq('productid', productId);
+
+        await _supabase.from('stock_transaction').insert({
+          'transaction_id': 'TX-${DateTime.now().millisecondsSinceEpoch}',
+          'productid': productId,
+          'type': 'ADJ_OUT',
+          'quantity': qty,
+          'balance_after': newStock,
+          'reference_id': poId,
+          'created_at': DateTime.now().toIso8601String(),
+          'remarks': 'ยกเลิกบิลซื้อ $poId',
+        });
       }
       return true;
     } catch (e) {
@@ -533,7 +806,10 @@ class DatabaseService {
   Future<List<Map<String, dynamic>>> getDebtRecords() async {
     return await _supabase
         .from('debtrecord')
-        .select()
+        .select('''
+          *,
+          customer (customername, customerphone)
+        ''')
         .eq('debtrecordstatus', 'Confirmed')
         .order('startdate', ascending: false);
   }

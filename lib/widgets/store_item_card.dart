@@ -71,14 +71,15 @@ class StoreItemCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          Text(
-            '฿${product.price.toStringAsFixed(0)}',
-            style: GoogleFonts.prompt(
-              fontSize: 15,
-              fontWeight: FontWeight.bold,
-              color: const Color(0xFF1E2736),
+          if (!isPurchaseOrder)
+            Text(
+              '฿${product.price.toStringAsFixed(0)}',
+              style: GoogleFonts.prompt(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: const Color(0xFF1E2736),
+              ),
             ),
-          ),
           const SizedBox(height: 2),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,

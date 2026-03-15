@@ -63,7 +63,11 @@ class PurchaseOrderProvider with ChangeNotifier {
   }
 
   Future<void> updateSupplier(String id, String name, String phone) async {
-    await DatabaseService.instance.updateSupplier(id: id, name: name, phone: phone);
+    await DatabaseService.instance.updateSupplier(
+      id: id,
+      name: name,
+      phone: phone,
+    );
     await loadSuppliers();
   }
 
@@ -93,13 +97,11 @@ class PurchaseOrderProvider with ChangeNotifier {
   Future<bool> addPayment({
     required String poId,
     required double amount,
-    String? imagePath,
+    dynamic image,
   }) async {
     String? uploadedPath;
-    if (imagePath != null && !imagePath.startsWith('http')) {
-      uploadedPath = await DatabaseService.instance.uploadBillImage(File(imagePath));
-    } else {
-      uploadedPath = imagePath;
+    if (image != null) {
+      uploadedPath = await DatabaseService.instance.uploadBillImage(image);
     }
 
     final success = await DatabaseService.instance.addPurchasePayment(
@@ -117,7 +119,9 @@ class PurchaseOrderProvider with ChangeNotifier {
     return await DatabaseService.instance.getPurchasePaymentHistory(poId);
   }
 
-  Future<List<Map<String, dynamic>>> getPurchaseOrderDetails(String poId) async {
+  Future<List<Map<String, dynamic>>> getPurchaseOrderDetails(
+    String poId,
+  ) async {
     try {
       return await DatabaseService.instance.getPurchaseOrderDetails(poId);
     } catch (e) {
@@ -133,7 +137,7 @@ class PurchaseOrderProvider with ChangeNotifier {
       _items[product.id] = PurchaseOrderItem(
         product: product,
         quantity: 1,
-        costPrice: product.price * 0.7, // สมมติราคาต้นทุนเริ่มต้นที่ 70% ของราคาขาย
+        costPrice: 0.0,
       );
     }
     notifyListeners();

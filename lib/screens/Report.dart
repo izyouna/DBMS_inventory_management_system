@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:inventory_management_system/services/database_service.dart';
 import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
 import '../providers/product_provider.dart';
@@ -68,10 +69,10 @@ class _ReportScreenState extends State<ReportScreen> {
     final unpaidTotal = cartProvider.debtRecords
         .where(
           (d) =>
-              d['DeptStatus'] == 'Pending' &&
-              d['DeptRecordStatus'] == 'Confirmed',
+              d['debtstatus'] == 'Pending' &&
+              d['debtrecordstatus'] == 'Confirmed',
         )
-        .fold(0.0, (sum, d) => sum + (d['RemainingAmount'] as num).toDouble());
+        .fold(0.0, (sum, d) => sum + (d['remainingamount'] as num).toDouble());
 
     final filteredOrders = _selectedFilter == 'ทั้งหมด'
         ? cartProvider.orders
@@ -452,13 +453,13 @@ class _ReportScreenState extends State<ReportScreen> {
 
     final allDebtRecords = cartProvider.debtRecords;
     final debtRecord = allDebtRecords
-        .where((d) => d['OrderID'] == order.id)
+        .where((d) => d['order_id'] == order.id)
         .toList();
 
     if (debtRecord.isNotEmpty) {
       debtInfo = debtRecord.first;
       paymentHistory = await cartProvider.getDebtPaymentHistory(
-        debtInfo!['DebtID'],
+        debtInfo!['debtid'],
       );
     }
 
@@ -580,7 +581,7 @@ class _ReportScreenState extends State<ReportScreen> {
                     itemCount: paymentHistory.length,
                     itemBuilder: (ctx, i) {
                       final pay = paymentHistory[i];
-                      final payDate = DateTime.parse(pay['PaidDate']);
+                      final payDate = DateTime.parse(pay['paiddate']);
                       return Padding(
                         padding: const EdgeInsets.symmetric(vertical: 4.0),
                         child: Row(
@@ -590,7 +591,7 @@ class _ReportScreenState extends State<ReportScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  '฿${(pay['AmountPaid'] as num).toStringAsFixed(2)}',
+                                  '฿${(pay['amountpaid'] as num).toStringAsFixed(2)}',
                                   style: GoogleFonts.prompt(
                                     fontSize: 13,
                                     fontWeight: FontWeight.bold,
@@ -605,17 +606,20 @@ class _ReportScreenState extends State<ReportScreen> {
                                 ),
                               ],
                             ),
-                            if (pay['DeptPaidImagePath'] != null)
+                            if (pay['deptpaidimagepath'] != null)
                               IconButton(
                                 icon: const Icon(
                                   Icons.image_outlined,
                                   size: 20,
                                   color: Colors.blue,
                                 ),
-                                onPressed: () => _showFullScreenImage(
-                                  context,
-                                  pay['DeptPaidImagePath'],
-                                ),
+                                onPressed: () async {
+                                  final url = await DatabaseService.instance
+                                      .getSignedUrl(pay['deptpaidimagepath']);
+                                  if (context.mounted && url != null) {
+                                    _showFullScreenImage(context, url);
+                                  }
+                                },
                               ),
                           ],
                         ),
@@ -658,7 +662,7 @@ class _ReportScreenState extends State<ReportScreen> {
                         ),
                       ),
                       Text(
-                        '฿${(debtInfo['RemainingAmount'] as num).toStringAsFixed(2)}',
+                        '฿${(debtInfo['remainingamount'] as num).toStringAsFixed(2)}',
                         style: GoogleFonts.prompt(
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
@@ -710,7 +714,13 @@ class _ReportScreenState extends State<ReportScreen> {
         child: Stack(
           alignment: Alignment.center,
           children: [
-            InteractiveViewer(child: Image.file(File(imagePath))),
+            InteractiveViewer(
+              child:
+                  (imagePath.startsWith('http') ||
+                      imagePath.startsWith('blob:'))
+                  ? Image.network(imagePath)
+                  : Image.file(File(imagePath)),
+            ),
             Positioned(
               top: 0,
               right: 0,

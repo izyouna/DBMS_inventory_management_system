@@ -61,25 +61,26 @@ class CartProvider with ChangeNotifier {
         String unitLabel = 'ไม่ระบุหน่วย';
         
         if (productData != null && productData['productunit'] != null) {
-          unitLabel = productData['productunit']['unitname'] ?? productData['productunit']['UnitName'] ?? 'ไม่ระบุหน่วย';
+          unitLabel = productData['productunit']['unitname'] ?? 'ไม่ระบุหน่วย';
         }
 
         return CartItem(
           product: Product(
-            id: (productData != null ? (productData['productid'] ?? productData['ProductID']) : (d['productid'] ?? d['ProductID'] ?? '')).toString(),
-            name: productData != null ? (productData['productname'] ?? productData['ProductName'] ?? 'ไม่พบชื่อสินค้า') : (d['productname'] ?? d['ProductName'] ?? 'ไม่พบชื่อสินค้า'),
-            price: (d['unit_price'] ?? d['UnitPrice'] ?? 0).toDouble(),
+            id: (productData != null ? productData['productid'] : (d['productid'] ?? '')).toString(),
+            name: productData != null ? (productData['productname'] ?? 'ไม่พบชื่อสินค้า') : (d['productname'] ?? 'ไม่พบชื่อสินค้า'),
+            price: (d['unit_price'] ?? 0).toDouble(),
             stock: 0, 
             unit: ProductUnit(
-              id: (productData != null ? (productData['unitid'] ?? productData['UnitID']) : '').toString(), 
+              id: (productData != null ? productData['unitid'] : '').toString(), 
               label: unitLabel
             ),
             category: ProductCategory(id: '', label: ''),
           ),
-          quantity: (d['quantity'] ?? d['Quantity'] ?? 0).toInt(),
+          quantity: (d['quantity'] ?? 0).toInt(),
         );
       }).toList();
     } catch (e) {
+
       debugPrint("Error fetching order details: $e");
       return [];
     }
@@ -100,7 +101,7 @@ class CartProvider with ChangeNotifier {
   }
 
   // ฟังก์ชัน Checkout (ส่ง paymentStatus)
-  Future<Order> checkout(PaymentMethod method, {Customer? customer}) async {
+  Future<Order> checkout(PaymentMethod method, {Customer? customer, String? dueDate}) async {
     final now = DateTime.now();
     final paymentType = method.name; 
     
@@ -124,6 +125,8 @@ class CartProvider with ChangeNotifier {
       items: dbItems,
       customerName: customer?.name,
       phone: customer?.phone,
+      dueDate: dueDate,
+      creditLimit: customer?.creditLimit, // ส่งวงเงินเครดิตไปด้วย
     );
 
     // 2. สร้าง Order object สำหรับส่งกลับ (เพื่อให้มีรายการสินค้าครบถ้วนสำหรับปริ้น)
@@ -138,11 +141,13 @@ class CartProvider with ChangeNotifier {
       customer: customer,
     );
 
-    // 3. รีโหลดประวัติบิลและลูกหนี้จาก Database
-    await loadOrdersFromDatabase();
-    await loadDebtRecords();
+    // ล้างตะกร้าทันทีหลังบันทึกสำเร็จ
+    _items.clear();
     
-    clearCart();
+    // รีโหลดประวัติบิลและลูกหนี้แบบเบื้องหลัง (ไม่ต้องรอให้เสร็จก่อน return)
+    loadOrdersFromDatabase().catchError((e) => debugPrint("Error reloading orders: $e"));
+    loadDebtRecords().catchError((e) => debugPrint("Error reloading debt: $e"));
+    
     notifyListeners();
     return completedOrder;
   }
@@ -180,13 +185,11 @@ class CartProvider with ChangeNotifier {
   Future<bool> addDebtPayment({
     required String debtId,
     required double amount,
-    String? imagePath,
+    dynamic image,
   }) async {
     String? uploadedPath;
-    if (imagePath != null && !imagePath.startsWith('http')) {
-      uploadedPath = await DatabaseService.instance.uploadBillImage(File(imagePath));
-    } else {
-      uploadedPath = imagePath;
+    if (image != null) {
+      uploadedPath = await DatabaseService.instance.uploadBillImage(image);
     }
 
     final success = await DatabaseService.instance.addDebtPayment(

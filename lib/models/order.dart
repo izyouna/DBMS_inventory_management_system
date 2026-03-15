@@ -31,37 +31,47 @@ class Order {
     Customer? customer;
     
     // Handle joined debtrecord
-    final debtRecord = map['debtrecord'] ?? map['DebtRecord'];
+    final debtRecord = map['debtrecord'];
     if (debtRecord != null) {
       // Supabase join might return a list or a map
       final record = (debtRecord is List && debtRecord.isNotEmpty) ? debtRecord.first : debtRecord;
-      if (record is Map && (record['customername'] ?? record['CustomerName']) != null) {
-        customer = Customer(
-          id: (record['customerid'] ?? record['CustomerID'] ?? record['id'])?.toString() ?? '',
-          name: record['customername'] ?? record['CustomerName'] ?? record['name'] ?? '',
-          phone: record['customerphone'] ?? record['CustomerPhone'] ?? record['phone'] ?? '',
-        );
+      if (record is Map) {
+        final customerData = record['customer'];
+        if (customerData != null) {
+          customer = Customer(
+            id: (record['customerid'] ?? record['id'])?.toString() ?? '',
+            name: customerData['customername'] ?? '',
+            phone: customerData['customerphone'] ?? '',
+          );
+        } else if (record['customername'] != null) {
+          // Fallback if it was somehow flat (though our query is nested now)
+          customer = Customer(
+            id: (record['customerid'] ?? record['id'])?.toString() ?? '',
+            name: record['customername'] ?? '',
+            phone: record['customerphone'] ?? '',
+          );
+        }
       }
     }
 
     // Handle joined paymenttype
     String paymentMethodName = 'ไม่ระบุ';
-    final paymentType = map['paymenttype'] ?? map['PaymentType'];
+    final paymentType = map['paymenttype'];
     if (paymentType != null) {
-      paymentMethodName = (paymentType['paymentname'] ?? paymentType['PaymentName']) ?? 'ไม่ระบุ';
+      paymentMethodName = paymentType['paymentname'] ?? 'ไม่ระบุ';
     }
 
-    final paymentStatus = map['paymentstatus'] ?? map['PaymentStatus'];
+    final paymentStatus = map['paymentstatus'];
 
     return Order(
-      id: (map['order_id'] ?? map['Order_ID'] ?? map['OrderID'] ?? '').toString(), 
+      id: (map['order_id'] ?? '').toString(), 
       items: items,
-      totalAmount: (map['totalamount'] ?? map['TotalAmount'] ?? 0).toDouble(),
-      dateTime: DateTime.parse(map['orderdate'] ?? map['OrderDate']),
+      totalAmount: (map['totalamount'] ?? 0).toDouble(),
+      dateTime: DateTime.parse(map['orderdate']),
       paymentMethod: paymentMethodName,
       documentType: paymentStatus == 'ค้างชำระ' ? DocumentType.invoice : DocumentType.receipt,
       isPaid: paymentStatus != 'ค้างชำระ',
-      orderStatus: map['status'] ?? map['Status'] ?? 'Confirmed', 
+      orderStatus: map['status'] ?? 'Confirmed', 
       customer: customer, 
     );
   }

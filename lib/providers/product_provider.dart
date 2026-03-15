@@ -15,33 +15,34 @@ class ProductProvider with ChangeNotifier {
     loadProductsFromDatabase();
   }
 
+  bool _isLoading = false;
+  bool get isLoading => _isLoading;
+
   // ฟังก์ชันโหลดข้อมูลจากฐานข้อมูล
-  Future<void> loadProductsFromDatabase() async {
+  Future<void> loadProductsFromDatabase({bool force = false}) async {
+    if (_isLoading && !force) return;
+    _isLoading = true;
+    if (force) notifyListeners(); // แจ้ง UI ว่ากำลังเริ่มโหลดใหม่จริงๆ
+    
     try {
-      debugPrint("--- Start Loading Products ---");
-      // 1. โหลด Categories
-      final dbCategories = await DatabaseService.instance.getCategories();
-      debugPrint("Raw Categories from DB: $dbCategories");
-      _categories = dbCategories
-          .map((map) => ProductCategory.fromMap(map))
-          .toList();
-      debugPrint("Parsed Categories: ${_categories.length}");
+      debugPrint("--- Start Loading Products (Force: $force) ---");
+      
+      // ดึงข้อมูลทั้งหมดแบบขนานเพื่อความเร็ว
+      final results = await Future.wait([
+        DatabaseService.instance.getCategories(),
+        DatabaseService.instance.getProductUnits(),
+        DatabaseService.instance.getWarehouses(),
+        DatabaseService.instance.getProducts(),
+      ]);
 
-      // 2. โหลด Units
-      final dbUnits = await DatabaseService.instance.getProductUnits();
-      debugPrint("Raw Units from DB: $dbUnits");
+      final dbCategories = results[0] as List<Map<String, dynamic>>;
+      final dbUnits = results[1] as List<Map<String, dynamic>>;
+      final dbWarehouses = results[2] as List<Map<String, dynamic>>;
+      final dbProducts = results[3] as List<Map<String, dynamic>>;
+
+      _categories = dbCategories.map((map) => ProductCategory.fromMap(map)).toList();
       _units = dbUnits.map((map) => ProductUnit.fromMap(map)).toList();
-      debugPrint("Parsed Units: ${_units.length}");
-
-      // 3. โหลด Warehouses
-      final dbWarehouses = await DatabaseService.instance.getWarehouses();
-      debugPrint("Raw Warehouses from DB: $dbWarehouses");
       _warehouses = dbWarehouses.map((map) => Warehouse.fromMap(map)).toList();
-      debugPrint("Parsed Warehouses: ${_warehouses.length}");
-
-      // 4. โหลด Products
-      final dbProducts = await DatabaseService.instance.getProducts();
-      debugPrint("Raw Products from DB: $dbProducts");
 
       _products = dbProducts
           .map((map) {
@@ -58,9 +59,10 @@ class ProductProvider with ChangeNotifier {
       debugPrint("Successfully loaded ${_products.length} products");
       debugPrint("--- Finish Loading Products ---");
 
-      notifyListeners();
     } catch (e) {
       debugPrint("Critical error loading products: $e");
+    } finally {
+      _isLoading = false;
       notifyListeners();
     }
   }
@@ -118,6 +120,7 @@ class ProductProvider with ChangeNotifier {
         categoryId: updatedProduct.category.id,
         stock: updatedProduct.stock,
         price: updatedProduct.price,
+        markupPercentage: updatedProduct.markupPercentage,
         unitId: updatedProduct.unit.id,
         imagePath: finalImagePath,
         warehouseId: updatedProduct.warehouse?.id,

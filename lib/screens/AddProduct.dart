@@ -20,6 +20,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
   final _nameController = TextEditingController();
   final _stockController = TextEditingController();
   final _priceController = TextEditingController();
+  final _costController = TextEditingController();
+  final _markupController = TextEditingController();
 
   ProductUnit? _selectedUnit;
   ProductCategory? _selectedCategory;
@@ -28,12 +30,26 @@ class _AddProductScreenState extends State<AddProductScreen> {
   @override
   void initState() {
     super.initState();
+    _markupController.text = "0";
+    _costController.addListener(_calculatePrice);
+    _markupController.addListener(_calculatePrice);
+
     Future.microtask(() {
       if (!mounted) return;
       final provider = Provider.of<ProductProvider>(context, listen: false);
       _resetSelections(provider);
       provider.clearImage();
     });
+  }
+
+  void _calculatePrice() {
+    final cost = double.tryParse(_costController.text) ?? 0.0;
+    final markup = double.tryParse(_markupController.text) ?? 0.0;
+    if (cost > 0) {
+      final recommendedPrice = cost * (1 + (markup / 100));
+      // ปรับราคาขายในช่อง Selling Price อัตโนมัติ (แต่ยังให้แก้เองได้)
+      _priceController.text = recommendedPrice.toStringAsFixed(2);
+    }
   }
 
   void _resetSelections(ProductProvider provider) {
@@ -46,24 +62,13 @@ class _AddProductScreenState extends State<AddProductScreen> {
     });
   }
 
-  // void _clearFields() {
-  //   _nameController.clear();
-  //   _stockController.clear();
-  //   _priceController.clear();
-  //   final provider = Provider.of<ProductProvider>(context, listen: false);
-  //   provider.clearImage();
-  //   _resetSelections(provider);
-  //   _formKey.currentState?.reset();
-  //   if (provider.units.isNotEmpty) _selectedUnit = provider.units[0];
-  //   if (provider.categories.isNotEmpty)
-  //     _selectedCategory = provider.categories[0];
-  // }
-
   @override
   void dispose() {
     _nameController.dispose();
     _stockController.dispose();
     _priceController.dispose();
+    _costController.dispose();
+    _markupController.dispose();
     super.dispose();
   }
 
@@ -81,6 +86,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
       final name = _nameController.text.trim();
       final stock = int.tryParse(_stockController.text.trim()) ?? 0;
       final price = double.tryParse(_priceController.text.trim()) ?? 0.0;
+      final markup = double.tryParse(_markupController.text.trim()) ?? 0.0;
       
       String? imageUrl;
       if (provider.productImage != null) {
@@ -91,6 +97,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
         name: name,
         stock: stock,
         price: price,
+        markupPercentage: markup,
         unitId: _selectedUnit!.id,
         categoryId: _selectedCategory!.id,
         imagePath: imageUrl,
@@ -103,6 +110,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
         name: name,
         stock: stock,
         price: price,
+        markupPercentage: markup,
         unit: _selectedUnit!,
         category: _selectedCategory!,
         warehouse: _selectedWarehouse,
@@ -245,15 +253,40 @@ class _AddProductScreenState extends State<AddProductScreen> {
                         Row(
                           children: [
                             Expanded(
+                              flex: 2,
+                              child: TextFormField(
+                                controller: _costController,
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                decoration: _inputDecoration('ราคาทุน'),
+                                validator: (v) =>
+                                    (v == null || double.tryParse(v) == null)
+                                    ? 'ระบุราคาทุน'
+                                    : null,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              flex: 1,
+                              child: TextFormField(
+                                controller: _markupController,
+                                keyboardType: TextInputType.number,
+                                decoration: _inputDecoration('กำไร %'),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                        Row(
+                          children: [
+                            Expanded(
                               child: TextFormField(
                                 controller: _stockController,
                                 keyboardType: TextInputType.number,
-                                decoration: _inputDecoration('จำนวน'),
+                                decoration: _inputDecoration('จำนวนคงเหลือ'),
                                 validator: (v) =>
                                     (v == null || int.tryParse(v) == null)
-                                    ? 'ระบุตัวเลข'
-                                    : (int.tryParse(v) != null && int.parse(v) < 0)
-                                    ? 'จำนวนต้องไม่เป็นลบ'
+                                    ? 'ระบุจำนวน'
                                     : null,
                               ),
                             ),
@@ -261,13 +294,13 @@ class _AddProductScreenState extends State<AddProductScreen> {
                             Expanded(
                               child: TextFormField(
                                 controller: _priceController,
-                                keyboardType: TextInputType.number,
-                                decoration: _inputDecoration('ราคาขาย'),
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                decoration: _inputDecoration('ราคาขายจริง').copyWith(
+                                  suffixIcon: const Icon(Icons.edit, size: 16, color: Colors.blue),
+                                ),
                                 validator: (v) =>
-                                    (v == null || int.tryParse(v) == null)
-                                    ? 'ระบุตัวเลข'
-                                    : (int.tryParse(v) != null && int.parse(v) < 0)
-                                    ? 'จำนวนต้องไม่เป็นลบ'
+                                    (v == null || double.tryParse(v) == null)
+                                    ? 'ระบุราคาขาย'
                                     : null,
                               ),
                             ),
@@ -361,7 +394,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
   }
 
   InputDecoration _inputDecoration(String hint) => InputDecoration(
-    hintText: hint,
+    labelText: hint,
+    labelStyle: GoogleFonts.prompt(color: Colors.grey[600], fontSize: 14),
     filled: true,
     fillColor: Colors.grey[50],
     border: OutlineInputBorder(
