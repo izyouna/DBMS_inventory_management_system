@@ -58,6 +58,19 @@ class PdfService {
               ],
             ),
 
+            if (order.dueDate != null) ...[
+              pw.SizedBox(height: 5),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.end,
+                children: [
+                  pw.Text(
+                    'ครบกำหนดชำระ: ${DateFormat('dd/MM/yyyy').format(order.dueDate!)}',
+                    style: boldStyle.copyWith(color: PdfColors.red),
+                  ),
+                ],
+              ),
+            ],
+
             // ข้อมูลลูกค้า (ถ้ามี)
             if (order.customer != null) ...[
               pw.SizedBox(height: 5),

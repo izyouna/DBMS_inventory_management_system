@@ -139,6 +139,7 @@ class CartProvider with ChangeNotifier {
       documentType: method is CreditPayment ? DocumentType.invoice : DocumentType.receipt,
       isPaid: method is! CreditPayment,
       customer: customer,
+      dueDate: dueDate != null ? DateTime.parse(dueDate) : null,
     );
 
     // ล้างตะกร้าทันทีหลังบันทึกสำเร็จ

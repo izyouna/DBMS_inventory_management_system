@@ -335,6 +335,7 @@ class _ReportScreenState extends State<ReportScreen> {
           isPaid: order.isPaid,
           orderStatus: order.orderStatus,
           customer: order.customer,
+          dueDate: order.dueDate,
         );
 
         // สั่งปริ้น
@@ -689,6 +690,26 @@ class _ReportScreenState extends State<ReportScreen> {
                     ),
                   ],
                 ),
+                if (order.dueDate != null) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'วันครบกำหนดชำระ',
+                        style: GoogleFonts.prompt(fontSize: 14, color: Colors.red),
+                      ),
+                      Text(
+                        '${order.dueDate!.day}/${order.dueDate!.month}/${order.dueDate!.year + 543}',
+                        style: GoogleFonts.prompt(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.red,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),

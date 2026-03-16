@@ -11,6 +11,7 @@ class Order {
   final bool isPaid;
   final String orderStatus; // Confirmed, Cancelled
   final Customer? customer;
+  final DateTime? dueDate;
 
   Order({
     required this.id,
@@ -22,6 +23,7 @@ class Order {
     this.isPaid = true,
     this.orderStatus = 'Confirmed',
     this.customer,
+    this.dueDate,
   });
 
   String get documentName => documentType == DocumentType.receipt ? 'ใบเสร็จรับเงิน' : 'ใบแจ้งหนี้';
@@ -29,6 +31,7 @@ class Order {
   // แปลงจาก Map (Database) มาเป็น Order Object
   factory Order.fromMap(Map<String, dynamic> map, List<CartItem> items) {
     Customer? customer;
+    DateTime? dueDate;
     
     // Handle joined debtrecord
     final debtRecord = map['debtrecord'];
@@ -36,6 +39,10 @@ class Order {
       // Supabase join might return a list or a map
       final record = (debtRecord is List && debtRecord.isNotEmpty) ? debtRecord.first : debtRecord;
       if (record is Map) {
+        if (record['due_date'] != null) {
+          dueDate = DateTime.parse(record['due_date']);
+        }
+
         final customerData = record['customer'];
         if (customerData != null) {
           customer = Customer(
@@ -73,6 +80,7 @@ class Order {
       isPaid: paymentStatus != 'ค้างชำระ',
       orderStatus: map['status'] ?? 'Confirmed', 
       customer: customer, 
+      dueDate: dueDate,
     );
   }
 }
