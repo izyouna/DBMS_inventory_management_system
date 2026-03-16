@@ -144,7 +144,9 @@ class DatabaseService {
       final cleanPhone = phone.trim();
       final response = await _supabase
           .from('customer')
-          .select('*, debtrecord(remainingamount, debtstatus, debtrecordstatus)')
+          .select(
+            '*, debtrecord(remainingamount, debtstatus, debtrecordstatus)',
+          )
           .eq('customerphone', cleanPhone)
           .order('customerid', ascending: false)
           .limit(1);
@@ -156,7 +158,8 @@ class DatabaseService {
       if (customer['debtrecord'] != null) {
         final List records = customer['debtrecord'] as List;
         for (var dr in records) {
-          if (dr['debtstatus'] == 'Pending' && dr['debtrecordstatus'] == 'Confirmed') {
+          if (dr['debtstatus'] == 'Pending' &&
+              dr['debtrecordstatus'] == 'Confirmed') {
             totalDebt += (dr['remainingamount'] as num).toDouble();
           }
         }
@@ -282,7 +285,7 @@ class DatabaseService {
     double? creditLimit,
   }) async {
     final orderId = 'ORD-${DateTime.now().millisecondsSinceEpoch}';
-    
+
     try {
       await _supabase.from('saleorder').insert({
         'order_id': orderId,
@@ -293,8 +296,10 @@ class DatabaseService {
         'paymentid': paymentId,
       });
 
-      final List<String> productIds = items.map((e) => (e['productid'] ?? e['ProductID']).toString()).toList();
-      
+      final List<String> productIds = items
+          .map((e) => (e['productid'] ?? e['ProductID']).toString())
+          .toList();
+
       final List<dynamic> allProducts = await _supabase
           .from('product')
           .select('productid, totalunit')
@@ -305,7 +310,11 @@ class DatabaseService {
           .select('*, purchaseorder(receivedate)')
           .inFilter('productid', productIds)
           .gt('quantity_remaining', 0)
-          .order('receivedate', referencedTable: 'purchaseorder', ascending: true);
+          .order(
+            'receivedate',
+            referencedTable: 'purchaseorder',
+            ascending: true,
+          );
 
       List<Map<String, dynamic>> orderDetailsToInsert = [];
       List<Map<String, dynamic>> stockTransactionsToInsert = [];
@@ -314,20 +323,27 @@ class DatabaseService {
       List<Map<String, dynamic>> productUpdates = [];
 
       for (var item in items) {
-        final String productId = (item['productid'] ?? item['ProductID']).toString();
-        final double qtyToSell = (item['quantity'] ?? item['Quantity'] as num).toDouble();
-        final double unitPrice = (item['unit_price'] ?? item['UnitPrice'] ?? item['unitprice'] ?? 0).toDouble();
+        final String productId = (item['productid'] ?? item['ProductID'])
+            .toString();
+        final double qtyToSell = (item['quantity'] ?? item['Quantity'] as num)
+            .toDouble();
+        final double unitPrice =
+            (item['unit_price'] ?? item['UnitPrice'] ?? item['unitprice'] ?? 0)
+                .toDouble();
 
         if (qtyToSell <= 0) continue;
 
-        final productBatches = allBatches.where((b) => b['productid'] == productId).toList();
+        final productBatches = allBatches
+            .where((b) => b['productid'] == productId)
+            .toList();
         double remainingToExit = qtyToSell;
         double totalCostForThisItem = 0;
 
         for (var batch in productBatches) {
           if (remainingToExit <= 0.0001) break;
 
-          double batchRemaining = (batch['quantity_remaining'] as num).toDouble();
+          double batchRemaining = (batch['quantity_remaining'] as num)
+              .toDouble();
           double batchCostPrice = (batch['unitprice'] as num).toDouble();
           double takeFromBatch = 0;
 
@@ -345,7 +361,8 @@ class DatabaseService {
               'poid': batch['poid'],
               'productid': productId,
               'quantity_remaining': batchRemaining - takeFromBatch,
-              'unitprice': batch['unitprice'], // ต้องส่งค่าเดิมกลับไปด้วยหากเป็น PK/Required
+              'unitprice':
+                  batch['unitprice'], // ต้องส่งค่าเดิมกลับไปด้วยหากเป็น PK/Required
             });
             totalCostForThisItem += (takeFromBatch * batchCostPrice);
           }
@@ -368,15 +385,12 @@ class DatabaseService {
           final productInfo = matches.first;
           final int currentStock = (productInfo['totalunit'] as num).toInt();
           final int newStock = currentStock - qtyToSell.toInt();
-          
+
           // เตรียมข้อมูลสำหรับ Bulk Upsert สต็อกรวม
-          productUpdates.add({
-            'productid': productId,
-            'totalunit': newStock,
-          });
+          productUpdates.add({'productid': productId, 'totalunit': newStock});
 
           stockTransactionsToInsert.add({
-            'transaction_id': 'TX-${DateTime.now().millisecondsSinceEpoch}-${productId}',
+            'transaction_id': 'TX-${DateTime.now().millisecondsSinceEpoch}',
             'productid': productId,
             'type': 'OUT',
             'quantity': qtyToSell,
@@ -391,12 +405,16 @@ class DatabaseService {
 
       // 4. บันทึกข้อมูลแบบ Bulk (ส่ง API เพียงไม่กี่ครั้ง)
       final List<Future> dbOperations = [];
-      
+
       if (orderDetailsToInsert.isNotEmpty) {
-        dbOperations.add(_supabase.from('orderdetail').insert(orderDetailsToInsert));
+        dbOperations.add(
+          _supabase.from('orderdetail').insert(orderDetailsToInsert),
+        );
       }
       if (stockTransactionsToInsert.isNotEmpty) {
-        dbOperations.add(_supabase.from('stock_transaction').insert(stockTransactionsToInsert));
+        dbOperations.add(
+          _supabase.from('stock_transaction').insert(stockTransactionsToInsert),
+        );
       }
       if (batchUpdates.isNotEmpty) {
         // ใช้ upsert เพื่ออัปเดตหลายแถวในคำสั่งเดียว
@@ -412,7 +430,7 @@ class DatabaseService {
       int? finalCustomerId;
       if (customerName != null && customerName.isNotEmpty) {
         final cleanPhone = phone?.trim() ?? '';
-        
+
         Map<String, dynamic>? existing;
         // ค้นหาลูกค้าเดิม (เฉพาะกรณีที่มีเบอร์โทรศัพท์เท่านั้น)
         if (cleanPhone.isNotEmpty) {
@@ -421,7 +439,7 @@ class DatabaseService {
               .select('customerid')
               .eq('customerphone', cleanPhone)
               .limit(1);
-          
+
           if (results != null && (results as List).isNotEmpty) {
             existing = results[0];
           }
@@ -438,7 +456,7 @@ class DatabaseService {
                 .order('customerid', ascending: false)
                 .limit(1)
                 .maybeSingle();
-            
+
             int nextId;
             if (lastCustomer != null) {
               nextId = int.parse(lastCustomer['customerid'].toString()) + 1;
@@ -446,14 +464,20 @@ class DatabaseService {
               nextId = (DateTime.now().millisecondsSinceEpoch % 1000000) + 1000;
             }
 
-            final newCustomer = await _supabase.from('customer').insert({
-              'customerid': nextId,
-              'customername': customerName,
-              'customerphone': cleanPhone,
-              'credit_limit': creditLimit ?? 0.0,
-            }).select('customerid').maybeSingle();
-            
-            finalCustomerId = newCustomer != null ? newCustomer['customerid'] : nextId;
+            final newCustomer = await _supabase
+                .from('customer')
+                .insert({
+                  'customerid': nextId,
+                  'customername': customerName,
+                  'customerphone': cleanPhone,
+                  'credit_limit': creditLimit ?? 0.0,
+                })
+                .select('customerid')
+                .maybeSingle();
+
+            finalCustomerId = newCustomer != null
+                ? newCustomer['customerid']
+                : nextId;
           } catch (e) {
             debugPrint('Error creating customer: $e');
             // กรณีสร้างไม่สำเร็จ (เช่น เบอร์ซ้ำที่ไม่ได้ตรวจเจอตอนแรก) ให้ลองหาด้วยเบอร์อีกครั้ง
@@ -470,9 +494,11 @@ class DatabaseService {
       }
 
       // 6. จัดการข้อมูลหนี้สิน (เฉพาะกรณีขายเชื่อ)
-      if (paymentStatus == 'ขายเชื่อ (ค้างชำระ)' || paymentStatus == 'ค้างชำระ') {
+      if (paymentStatus == 'ขายเชื่อ (ค้างชำระ)' ||
+          paymentStatus == 'ค้างชำระ') {
         // สร้างรหัสหนี้ที่สั้นลงและปลอดภัย
-        final debtId = 'D${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
+        final debtId =
+            'D${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
         await _supabase.from('debtrecord').insert({
           'debtid': debtId,
           'order_id': orderId,
