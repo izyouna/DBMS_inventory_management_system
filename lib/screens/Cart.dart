@@ -301,18 +301,20 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
-  void _processCheckout(BuildContext context, CartProvider cart, PaymentMethod method) async {
+  void _processCheckout(BuildContext sheetContext, CartProvider cart, PaymentMethod method) async {
     final String customerNameText = _nameController.text.trim();
     final String customerPhoneText = _phoneController.text.trim();
 
     if (method is CreditPayment && (customerNameText.isEmpty || customerPhoneText.isEmpty)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('กรุณากรอกข้อมูลลูกค้าก่อนทำการขายเชื่อ', style: GoogleFonts.prompt()), backgroundColor: Colors.red),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('กรุณากรอกข้อมูลลูกค้าก่อนทำการขายเชื่อ', style: GoogleFonts.prompt()), backgroundColor: Colors.red),
+        );
+      }
       return;
     }
 
-    Navigator.of(context).pop(); // ปิด Bottom Sheet
+    Navigator.of(sheetContext).pop(); // ปิด Bottom Sheet
     setState(() => _isProcessing = true);
 
     try {
@@ -326,7 +328,7 @@ class _CartScreenState extends State<CartScreen> {
         }
         if (currentDebt + cart.totalAmount > limit) {
           setState(() => _isProcessing = false);
-          if (context.mounted) _showCreditExceededDialog(context, limit, currentDebt, cart.totalAmount);
+          if (mounted) _showCreditExceededDialog(context, limit, currentDebt, cart.totalAmount);
           return;
         }
       }
@@ -354,7 +356,7 @@ class _CartScreenState extends State<CartScreen> {
       _existingCustomer = null;
       setState(() => _isProcessing = false);
 
-      if (context.mounted) {
+      if (mounted) {
         _showSuccessDialog(context, order);
       }
 
@@ -367,7 +369,7 @@ class _CartScreenState extends State<CartScreen> {
     } catch (e) {
       debugPrint("Checkout Error: $e");
       setState(() => _isProcessing = false);
-      if (context.mounted) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('บันทึกไม่สำเร็จ: $e', style: GoogleFonts.prompt()), backgroundColor: Colors.red),
         );

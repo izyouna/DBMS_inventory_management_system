@@ -118,7 +118,7 @@ class ProductProvider with ChangeNotifier {
         id: updatedProduct.id,
         name: updatedProduct.name,
         categoryId: updatedProduct.category.id,
-        stock: updatedProduct.stock,
+        // ไม่ส่ง stock ไปเพื่อป้องกันการเขียนทับด้วยข้อมูลเก่า
         price: updatedProduct.price,
         markupPercentage: updatedProduct.markupPercentage,
         unitId: updatedProduct.unit.id,
@@ -141,30 +141,6 @@ class ProductProvider with ChangeNotifier {
     }
     _products.removeWhere((p) => p.id == id);
     notifyListeners();
-  }
-
-  void reduceStock(String productId, int quantity) async {
-    final index = _products.indexWhere((p) => p.id == productId);
-    if (index != -1) {
-      final newStock = _products[index].stock - quantity;
-      _products[index].stock = newStock < 0 ? 0 : newStock;
-      notifyListeners();
-
-      try {
-        await DatabaseService.instance.updateProduct(
-          id: productId,
-          name: _products[index].name,
-          categoryId: _products[index].category.id,
-          stock: _products[index].stock,
-          price: _products[index].price,
-          unitId: _products[index].unit.id, // Updated from .label
-          imagePath: _products[index].imagePath,
-          warehouseId: _products[index].warehouse?.id,
-        );
-      } catch (e) {
-        debugPrint("Error updating stock in DB: $e");
-      }
-    }
   }
 
   int get lowStockCount => _products.where((p) => p.isLowStock).length;

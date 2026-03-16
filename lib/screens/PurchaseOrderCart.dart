@@ -40,9 +40,9 @@ class _PurchaseOrderCartScreenState extends State<PurchaseOrderCartScreen> {
     }
   }
 
-  Future<void> _selectDueDate(BuildContext context) async {
+  Future<void> _selectDueDate(BuildContext screenContext) async {
     final DateTime? picked = await showDatePicker(
-      context: context,
+      context: screenContext,
       initialDate: _dueDate ?? DateTime.now().add(const Duration(days: 30)),
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
@@ -553,7 +553,7 @@ class _PurchaseOrderCartScreenState extends State<PurchaseOrderCartScreen> {
             width: double.infinity,
             height: 50,
             child: ElevatedButton(
-              onPressed: po.itemCount == 0 ? null : () => _confirmPurchase(context, po),
+              onPressed: po.itemCount == 0 ? null : () => _confirmPurchase(po),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF1E2736),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -567,7 +567,7 @@ class _PurchaseOrderCartScreenState extends State<PurchaseOrderCartScreen> {
     );
   }
 
-  void _confirmPurchase(BuildContext context, PurchaseOrderProvider po) async {
+  void _confirmPurchase(PurchaseOrderProvider po) async {
     final productProvider = Provider.of<ProductProvider>(context, listen: false);
 
     showDialog(
@@ -641,7 +641,8 @@ class _PurchaseOrderCartScreenState extends State<PurchaseOrderCartScreen> {
                       id: item.product.id,
                       name: item.product.name,
                       categoryId: item.product.category.id,
-                      stock: item.product.stock + item.quantity, // อัปเดตสต็อกรวม
+                      // ไม่ส่ง stock ไปเพื่อป้องกันการเขียนทับด้วยข้อมูลเก่า (Stale Data)
+                      // เนื่องจาก savePurchaseOrder ด้านบนได้อัปเดตสต็อกใน DB ไปแล้ว
                       price: newSuggestedPrice, // ใช้ราคาใหม่ที่แนะนำ
                       unitId: item.product.unit.id,
                       imagePath: item.product.imagePath,
@@ -657,10 +658,12 @@ class _PurchaseOrderCartScreenState extends State<PurchaseOrderCartScreen> {
                 po.clear();
                 
                 if (!mounted) return;
+                
+                final messenger = ScaffoldMessenger.of(context);
                 Navigator.pop(ctx); // ปิด Dialog
                 Navigator.pop(context, true); // ออกจากหน้ารถเข็น พร้อมส่งผลลัพธ์สำเร็จ
 
-                ScaffoldMessenger.of(context).showSnackBar(
+                messenger.showSnackBar(
                   SnackBar(
                     content: Text('นำสินค้าเข้าสต็อกและบันทึกข้อมูลสำเร็จ!', style: GoogleFonts.prompt()), 
                     backgroundColor: Colors.green

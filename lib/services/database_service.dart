@@ -224,6 +224,47 @@ class DatabaseService {
       'warehouseid': warehouseId,
       'is_active': 1,
     });
+
+    // หากมีการระบุจำนวนเริ่มต้น ให้สร้างล็อตสินค้าและทรานแซกชันด้วย
+    if (stock > 0) {
+      final poId = 'INIT-${DateTime.now().millisecondsSinceEpoch}';
+
+      // 1. สร้างหัวบิลสั่งซื้อเสมือนสำหรับยอดยกมา
+      try {
+        await _supabase.from('purchaseorder').insert({
+          'poid': poId,
+          'receivedate': DateTime.now().toIso8601String(),
+          'totalcost': 0,
+          'paidamount': 0,
+          'status': 'Confirmed',
+          'paymentstatus': 'Paid',
+        });
+
+        // 2. สร้างล็อตสินค้าเพื่อให้ FIFO ทำงานได้
+        await _supabase.from('purchasedetail').insert({
+          'poid': poId,
+          'productid': newId,
+          'unitprice': 0,
+          'quantity': stock,
+          'quantity_remaining': stock,
+        });
+
+        // 3. บันทึกทรานแซกชัน
+        await _supabase.from('stock_transaction').insert({
+          'transaction_id': 'TX-${DateTime.now().microsecondsSinceEpoch}',
+          'productid': newId,
+          'type': 'IN',
+          'quantity': stock,
+          'balance_after': stock,
+          'reference_id': poId,
+          'created_at': DateTime.now().toIso8601String(),
+          'remarks': 'บันทึกยอดยกมาเริ่มต้น',
+        });
+      } catch (e) {
+        debugPrint('Error creating initial stock records: $e');
+      }
+    }
+
     return newId;
   }
 
@@ -250,25 +291,34 @@ class DatabaseService {
     required String id,
     required String name,
     String? categoryId,
-    required int stock,
+    int? stock, // เปลี่ยนเป็น optional
     required double price,
-    double markupPercentage = 0.0,
+    double? markupPercentage, // เปลี่ยนเป็น optional
     required String unitId,
     String? imagePath,
     String? warehouseId,
   }) async {
+    final Map<String, dynamic> updateData = {
+      'productname': name,
+      'categoryid': categoryId,
+      'price': price,
+      'unitid': unitId,
+      'productimagepath': imagePath,
+      'warehouseid': warehouseId,
+    };
+
+    if (markupPercentage != null) {
+      updateData['markup_percentage'] = markupPercentage;
+    }
+
+    // อัปเดตสต็อกเฉพาะเมื่อมีการส่งมาเท่านั้น (ปกติจะไม่ส่งมาจากหน้า Edit หรือ PO)
+    if (stock != null) {
+      updateData['totalunit'] = stock;
+    }
+
     await _supabase
         .from('product')
-        .update({
-          'productname': name,
-          'categoryid': categoryId,
-          'totalunit': stock,
-          'price': price,
-          'markup_percentage': markupPercentage,
-          'unitid': unitId,
-          'productimagepath': imagePath,
-          'warehouseid': warehouseId,
-        })
+        .update(updateData)
         .eq('productid', id);
   }
 
@@ -296,73 +346,80 @@ class DatabaseService {
         'paymentid': paymentId,
       });
 
-      final List<String> productIds = items
-          .map((e) => (e['productid'] ?? e['ProductID']).toString())
-          .toList();
+      // 1. รวบรวมข้อมูลสินค้าที่ถูกสั่งซื้อ (Grouping by productid)
+      final Map<String, double> productQtyMap = {};
+      final Map<String, double> productPriceMap = {};
+      for (var item in items) {
+        final String pid = (item['productid'] ?? item['ProductID']).toString();
+        final double qty = (item['quantity'] ?? item['Quantity'] as num).toDouble();
+        final double price = (item['unit_price'] ?? item['UnitPrice'] ?? item['unitprice'] ?? 0).toDouble();
+        
+        productQtyMap[pid] = (productQtyMap[pid] ?? 0) + qty;
+        productPriceMap[pid] = price;
+      }
 
-      final List<dynamic> allProducts = await _supabase
+      final List<String> productIds = productQtyMap.keys.toList();
+
+      final List<dynamic> allProductsRaw = await _supabase
           .from('product')
           .select('productid, totalunit')
           .inFilter('productid', productIds);
+      
+      final Map<String, int> productStockMap = {
+        for (var p in allProductsRaw) p['productid'].toString(): (p['totalunit'] as num).toInt()
+      };
 
-      final List<dynamic> allBatches = await _supabase
+      final List<dynamic> allBatchesRaw = await _supabase
           .from('purchasedetail')
           .select('*, purchaseorder(receivedate)')
           .inFilter('productid', productIds)
           .gt('quantity_remaining', 0)
-          .order(
-            'receivedate',
-            referencedTable: 'purchaseorder',
-            ascending: true,
-          );
+          .order('receivedate', referencedTable: 'purchaseorder', ascending: true);
+      
+      List<Map<String, dynamic>> localBatches = List<Map<String, dynamic>>.from(
+        allBatchesRaw.map((b) => Map<String, dynamic>.from(b))
+      );
 
       List<Map<String, dynamic>> orderDetailsToInsert = [];
       List<Map<String, dynamic>> stockTransactionsToInsert = [];
-
       List<Map<String, dynamic>> batchUpdates = [];
       List<Map<String, dynamic>> productUpdates = [];
 
-      for (var item in items) {
-        final String productId = (item['productid'] ?? item['ProductID'])
-            .toString();
-        final double qtyToSell = (item['quantity'] ?? item['Quantity'] as num)
-            .toDouble();
-        final double unitPrice =
-            (item['unit_price'] ?? item['UnitPrice'] ?? item['unitprice'] ?? 0)
-                .toDouble();
+      final int baseTimestamp = DateTime.now().microsecondsSinceEpoch;
+      int itemIndex = 0;
+
+      for (String productId in productIds) {
+        double qtyToSell = productQtyMap[productId]!;
+        double unitPrice = productPriceMap[productId]!;
 
         if (qtyToSell <= 0) continue;
 
-        final productBatches = allBatches
-            .where((b) => b['productid'] == productId)
-            .toList();
         double remainingToExit = qtyToSell;
         double totalCostForThisItem = 0;
 
-        for (var batch in productBatches) {
-          if (remainingToExit <= 0.0001) break;
+        for (var batch in localBatches) {
+          if (batch['productid'] != productId || remainingToExit <= 0.0001) continue;
 
-          double batchRemaining = (batch['quantity_remaining'] as num)
-              .toDouble();
+          double batchRemaining = (batch['quantity_remaining'] as num).toDouble();
           double batchCostPrice = (batch['unitprice'] as num).toDouble();
           double takeFromBatch = 0;
 
           if (batchRemaining <= remainingToExit) {
             takeFromBatch = batchRemaining;
             remainingToExit -= batchRemaining;
+            batch['quantity_remaining'] = 0;
           } else {
             takeFromBatch = remainingToExit;
+            batch['quantity_remaining'] = batchRemaining - takeFromBatch;
             remainingToExit = 0;
           }
 
           if (takeFromBatch > 0) {
-            // เตรียมข้อมูลสำหรับ Bulk Upsert ล็อตสินค้า
             batchUpdates.add({
               'poid': batch['poid'],
               'productid': productId,
-              'quantity_remaining': batchRemaining - takeFromBatch,
-              'unitprice':
-                  batch['unitprice'], // ต้องส่งค่าเดิมกลับไปด้วยหากเป็น PK/Required
+              'quantity_remaining': batch['quantity_remaining'],
+              'unitprice': batch['unitprice'],
             });
             totalCostForThisItem += (takeFromBatch * batchCostPrice);
           }
@@ -380,17 +437,16 @@ class DatabaseService {
           'cost_price': finalCostPrice,
         });
 
-        final matches = allProducts.where((p) => p['productid'] == productId);
-        if (matches.isNotEmpty) {
-          final productInfo = matches.first;
-          final int currentStock = (productInfo['totalunit'] as num).toInt();
-          final int newStock = currentStock - qtyToSell.toInt();
+        if (productStockMap.containsKey(productId)) {
+          int currentStock = productStockMap[productId]!;
+          int newStock = currentStock - qtyToSell.round();
+          if (newStock < 0) newStock = 0;
 
-          // เตรียมข้อมูลสำหรับ Bulk Upsert สต็อกรวม
+          debugPrint('DEBUG: Stock Update for $productId: $currentStock -> $newStock (qty: $qtyToSell)');
           productUpdates.add({'productid': productId, 'totalunit': newStock});
 
           stockTransactionsToInsert.add({
-            'transaction_id': 'TX-${DateTime.now().millisecondsSinceEpoch}',
+            'transaction_id': 'TX-${baseTimestamp + itemIndex}',
             'productid': productId,
             'type': 'OUT',
             'quantity': qtyToSell,
@@ -400,24 +456,18 @@ class DatabaseService {
             'created_at': DateTime.now().toIso8601String(),
             'remarks': 'ขายสินค้าบิล $orderId (FIFO)',
           });
+          itemIndex++;
         }
       }
 
-      // 4. บันทึกข้อมูลแบบ Bulk (ส่ง API เพียงไม่กี่ครั้ง)
       final List<Future> dbOperations = [];
-
       if (orderDetailsToInsert.isNotEmpty) {
-        dbOperations.add(
-          _supabase.from('orderdetail').insert(orderDetailsToInsert),
-        );
+        dbOperations.add(_supabase.from('orderdetail').insert(orderDetailsToInsert));
       }
       if (stockTransactionsToInsert.isNotEmpty) {
-        dbOperations.add(
-          _supabase.from('stock_transaction').insert(stockTransactionsToInsert),
-        );
+        dbOperations.add(_supabase.from('stock_transaction').insert(stockTransactionsToInsert));
       }
       if (batchUpdates.isNotEmpty) {
-        // ใช้ upsert เพื่ออัปเดตหลายแถวในคำสั่งเดียว
         dbOperations.add(_supabase.from('purchasedetail').upsert(batchUpdates));
       }
       if (productUpdates.isNotEmpty) {
@@ -555,6 +605,8 @@ class DatabaseService {
           .eq('order_id', orderId);
 
       final details = await getOrderDetails(orderId);
+      final int baseTimestamp = DateTime.now().microsecondsSinceEpoch;
+      int itemIndex = 0;
       for (var item in details) {
         final String productId = item['productid'];
         final double qty = (item['quantity'] as num).toDouble();
@@ -565,8 +617,8 @@ class DatabaseService {
             .eq('productid', productId)
             .single();
 
-        final int currentStock = productResponse['totalunit'];
-        final int newStock = currentStock + qty.toInt();
+        final int currentStock = (productResponse['totalunit'] as num).toInt();
+        final int newStock = currentStock + qty.round();
 
         await _supabase
             .from('product')
@@ -592,7 +644,7 @@ class DatabaseService {
         }
 
         await _supabase.from('stock_transaction').insert({
-          'transaction_id': 'TX-${DateTime.now().millisecondsSinceEpoch}',
+          'transaction_id': 'TX-${baseTimestamp + itemIndex}',
           'productid': productId,
           'type': 'ADJ_IN',
           'quantity': qty,
@@ -601,6 +653,7 @@ class DatabaseService {
           'created_at': DateTime.now().toIso8601String(),
           'remarks': 'ยกเลิกบิลขาย $orderId (คืนสต็อกเข้าล็อตล่าสุด)',
         });
+        itemIndex++;
       }
       return true;
     } catch (e) {
@@ -644,6 +697,8 @@ class DatabaseService {
       'due_date': dueDate,
     });
 
+    final int baseTimestamp = DateTime.now().microsecondsSinceEpoch;
+    int itemIndex = 0;
     for (var item in items) {
       final String productId = item['productid'] ?? item['ProductID'];
       final double qty = (item['quantity'] ?? item['Quantity'] as num)
@@ -665,8 +720,8 @@ class DatabaseService {
           .eq('productid', productId)
           .single();
 
-      final int currentStock = productResponse['totalunit'];
-      final int newStock = currentStock + qty.toInt();
+      final int currentStock = (productResponse['totalunit'] as num).toInt();
+      final int newStock = currentStock + qty.round();
 
       await _supabase
           .from('product')
@@ -674,7 +729,7 @@ class DatabaseService {
           .eq('productid', productId);
 
       await _supabase.from('stock_transaction').insert({
-        'transaction_id': 'TX-${DateTime.now().millisecondsSinceEpoch}',
+        'transaction_id': 'TX-${baseTimestamp + itemIndex}',
         'productid': productId,
         'type': 'IN',
         'quantity': qty,
@@ -684,6 +739,7 @@ class DatabaseService {
         'created_at': DateTime.now().toIso8601String(),
         'remarks': 'ซื้อสินค้าเข้าบิล $poId',
       });
+      itemIndex++;
     }
 
     return poId;
@@ -720,6 +776,8 @@ class DatabaseService {
           .eq('poid', poId);
 
       final details = await getPurchaseOrderDetails(poId);
+      final int baseTimestamp = DateTime.now().microsecondsSinceEpoch;
+      int itemIndex = 0;
       for (var item in details) {
         final String productId = item['productid'];
         final double qty = (item['quantity'] as num).toDouble();
@@ -730,12 +788,12 @@ class DatabaseService {
             .eq('productid', productId)
             .single();
 
-        final int currentStock = productResponse['totalunit'];
-        final int newStock = currentStock - qty.toInt();
+        final int currentStock = (productResponse['totalunit'] as num).toInt();
+        final int newStock = currentStock - qty.round();
 
         await _supabase
             .from('product')
-            .update({'totalunit': newStock})
+            .update({'totalunit': newStock < 0 ? 0 : newStock})
             .eq('productid', productId);
 
         await _supabase
@@ -745,15 +803,16 @@ class DatabaseService {
             .eq('productid', productId);
 
         await _supabase.from('stock_transaction').insert({
-          'transaction_id': 'TX-${DateTime.now().millisecondsSinceEpoch}',
+          'transaction_id': 'TX-${baseTimestamp + itemIndex}',
           'productid': productId,
           'type': 'ADJ_OUT',
           'quantity': qty,
-          'balance_after': newStock,
+          'balance_after': newStock < 0 ? 0 : newStock,
           'reference_id': poId,
           'created_at': DateTime.now().toIso8601String(),
           'remarks': 'ยกเลิกบิลซื้อ $poId',
         });
+        itemIndex++;
       }
       return true;
     } catch (e) {
