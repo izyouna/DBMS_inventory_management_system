@@ -22,18 +22,21 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<PurchaseOrderProvider>(context, listen: false).loadPurchaseHistory();
+      Provider.of<PurchaseOrderProvider>(
+        context,
+        listen: false,
+      ).loadPurchaseHistory();
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final poProvider = Provider.of<PurchaseOrderProvider>(context);
-    
+
     final filteredHistory = poProvider.purchaseHistory.where((po) {
       if (_selectedFilter == 'ทั้งหมด') return true;
-      if (_selectedFilter == 'เงินสด') return po['PTName'] == 'เงินสด';
-      if (_selectedFilter == 'ค้างชำระ') return po['PTName'] == 'ค้างชำระ (เครดิต)';
+      if (_selectedFilter == 'เงินสด') return po['ptid'] == 'PT1';
+      if (_selectedFilter == 'ค้างชำระ') return po['ptid'] == 'PT2';
       return true;
     }).toList();
 
@@ -47,7 +50,7 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          'ประวัติใบสั่งซื้อ',
+          'ประวัติการรับสินค้า',
           style: GoogleFonts.prompt(
             color: Colors.black,
             fontWeight: FontWeight.bold,
@@ -71,7 +74,10 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
                   final filter = _filters[index];
                   final isSelected = _selectedFilter == filter;
                   return ChoiceChip(
-                    label: Text(filter, style: GoogleFonts.prompt(fontSize: 13)),
+                    label: Text(
+                      filter,
+                      style: GoogleFonts.prompt(fontSize: 13),
+                    ),
                     selected: isSelected,
                     onSelected: (selected) {
                       if (selected) setState(() => _selectedFilter = filter);
@@ -81,7 +87,9 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
                       color: isSelected ? Colors.white : Colors.black,
                     ),
                     backgroundColor: const Color(0xFFF5F6FA),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
                     side: BorderSide.none,
                   );
                 },
@@ -102,24 +110,29 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
                     itemCount: filteredHistory.length,
                     itemBuilder: (context, index) {
                       final po = filteredHistory[index];
-                      final date = DateTime.parse(po['ReceiveDate']);
-                      final status = po['Status'] ?? 'Confirmed';
-                      final payStatus = po['PaymentStatus'] ?? 'Paid';
+                      final date = DateTime.parse(po['receivedate']);
+                      final status = po['status'] ?? 'Confirmed';
+                      final payStatus = po['paymentstatus'] ?? 'Paid';
                       final isConfirmed = status == 'Confirmed';
                       final isPaid = payStatus == 'Paid';
-                      
+
                       return Card(
                         margin: const EdgeInsets.only(bottom: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         child: ListTile(
                           onTap: () => _showPODetails(context, po),
                           title: Row(
                             children: [
                               Expanded(
                                 child: Text(
-                                  'PO ID: ${po['POID']}',
+                                  'PO ID: ${po['poid']}',
                                   overflow: TextOverflow.ellipsis,
-                                  style: GoogleFonts.prompt(fontWeight: FontWeight.bold, fontSize: 14),
+                                  style: GoogleFonts.prompt(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
                                 ),
                               ),
                               const SizedBox(width: 4),
@@ -141,14 +154,20 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
                                 'วันที่: ${date.toString().split('.')[0]}',
                                 style: GoogleFonts.prompt(fontSize: 12),
                               ),
-                              if (po['SupplierName'] != null)
+                              if (po['supplier'] != null)
                                 Text(
-                                  'ผู้จัดจำหน่าย: ${po['SupplierName']}',
-                                  style: GoogleFonts.prompt(fontSize: 11, color: Colors.blueGrey),
+                                  'ผู้จัดจำหน่าย: ${po['supplier']['supplier_name']}',
+                                  style: GoogleFonts.prompt(
+                                    fontSize: 11,
+                                    color: Colors.blueGrey,
+                                  ),
                                 ),
                               Text(
-                                'ประเภท: ${po['PTName'] ?? 'ไม่ระบุ'}',
-                                style: GoogleFonts.prompt(fontSize: 11, color: Colors.blueGrey),
+                                'ประเภท: ${po['purchasetype']?['ptname'] ?? 'ไม่ระบุ'}',
+                                style: GoogleFonts.prompt(
+                                  fontSize: 11,
+                                  color: Colors.blueGrey,
+                                ),
                               ),
                             ],
                           ),
@@ -156,14 +175,18 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
-                                '฿${(po['TotalCost'] as num).toStringAsFixed(2)}',
+                                '฿${(po['totalcost'] as num).toStringAsFixed(2)}',
                                 style: GoogleFonts.prompt(
                                   fontWeight: FontWeight.bold,
                                   color: Colors.black87,
                                 ),
                               ),
                               const SizedBox(width: 4),
-                              const Icon(Icons.chevron_right, color: Colors.grey, size: 20),
+                              const Icon(
+                                Icons.chevron_right,
+                                color: Colors.grey,
+                                size: 20,
+                              ),
                             ],
                           ),
                         ),
@@ -187,32 +210,38 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
       child: Text(
         text,
         style: GoogleFonts.prompt(
-          fontSize: 9, 
+          fontSize: 9,
           color: color,
-          fontWeight: FontWeight.bold
+          fontWeight: FontWeight.bold,
         ),
       ),
     );
   }
 
   void _showPODetails(BuildContext context, Map<String, dynamic> po) async {
-    final poProvider = Provider.of<PurchaseOrderProvider>(context, listen: false);
-    final productProvider = Provider.of<ProductProvider>(context, listen: false);
-    
+    final poProvider = Provider.of<PurchaseOrderProvider>(
+      context,
+      listen: false,
+    );
+    final productProvider = Provider.of<ProductProvider>(
+      context,
+      listen: false,
+    );
+
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => const Center(child: CircularProgressIndicator()),
     );
 
-    final items = await poProvider.getPurchaseOrderDetails(po['POID']);
-    final paymentHistory = await poProvider.getPaymentHistory(po['POID']);
-    
+    final items = await poProvider.getPurchaseOrderDetails(po['poid']);
+    final paymentHistory = await poProvider.getPaymentHistory(po['poid']);
+
     if (!mounted) return;
     Navigator.pop(context);
 
-    final status = po['Status'] ?? 'Confirmed';
-    final payStatus = po['PaymentStatus'] ?? 'Paid';
+    final status = po['status'] ?? 'Confirmed';
+    final payStatus = po['paymentstatus'] ?? 'Paid';
     final isConfirmed = status == 'Confirmed';
     final isPaid = payStatus == 'Paid';
 
@@ -226,21 +255,41 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Expanded(child: Text('รายละเอียดใบสั่งซื้อ', style: GoogleFonts.prompt(fontWeight: FontWeight.bold))),
+                Expanded(
+                  child: Text(
+                    'รายละเอียดใบสั่งซื้อ',
+                    style: GoogleFonts.prompt(fontWeight: FontWeight.bold),
+                  ),
+                ),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    _buildStatusBadge(isConfirmed ? 'ยืนยันแล้ว' : 'ยกเลิกแล้ว', isConfirmed ? Colors.green : Colors.red),
+                    _buildStatusBadge(
+                      isConfirmed ? 'ยืนยันแล้ว' : 'ยกเลิกแล้ว',
+                      isConfirmed ? Colors.green : Colors.red,
+                    ),
                     const SizedBox(height: 4),
-                    _buildStatusBadge(isPaid ? 'ชำระแล้ว' : 'ค้างชำระ', isPaid ? Colors.blue : Colors.orange),
+                    _buildStatusBadge(
+                      isPaid ? 'ชำระแล้ว' : 'ค้างชำระ',
+                      isPaid ? Colors.blue : Colors.orange,
+                    ),
                   ],
                 ),
               ],
             ),
-            Text(po['POID'], style: GoogleFonts.prompt(fontSize: 14, color: Colors.grey)),
-            if (po['SupplierName'] != null)
-              Text('ผู้จัดจำหน่าย: ${po['SupplierName']}', style: GoogleFonts.prompt(fontSize: 12, color: Colors.blueGrey)),
-            Text('ประเภทการชำระ: ${po['PTName'] ?? '-'}', style: GoogleFonts.prompt(fontSize: 12, color: Colors.blueGrey)),
+            Text(
+              po['poid'],
+              style: GoogleFonts.prompt(fontSize: 14, color: Colors.grey),
+            ),
+            if (po['supplier'] != null)
+              Text(
+                'ผู้จัดจำหน่าย: ${po['supplier']['supplier_name']}',
+                style: GoogleFonts.prompt(fontSize: 12, color: Colors.blueGrey),
+              ),
+            Text(
+              'ประเภทการชำระ: ${po['purchasetype']?['ptname'] ?? '-'}',
+              style: GoogleFonts.prompt(fontSize: 12, color: Colors.blueGrey),
+            ),
           ],
         ),
         content: SizedBox(
@@ -251,11 +300,20 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Divider(),
-                Text('รายการสินค้า', style: GoogleFonts.prompt(fontWeight: FontWeight.bold, fontSize: 14)),
+                Text(
+                  'รายการสินค้า',
+                  style: GoogleFonts.prompt(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
                 if (items.isEmpty)
                   Padding(
                     padding: const EdgeInsets.all(16.0),
-                    child: Text('ไม่พบรายการสินค้า', style: GoogleFonts.prompt(color: Colors.grey)),
+                    child: Text(
+                      'ไม่พบรายการสินค้า',
+                      style: GoogleFonts.prompt(color: Colors.grey),
+                    ),
                   )
                 else
                   ListView.builder(
@@ -273,20 +331,42 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(item['ProductName'] ?? 'Unknown', style: GoogleFonts.prompt(fontWeight: FontWeight.w600, fontSize: 14)),
-                                  Text('ต้นทุนต่อหน่วย: ฿${(item['UnitPrice'] as num).toStringAsFixed(2)}', 
-                                    style: GoogleFonts.prompt(fontSize: 12, color: Colors.grey)),
+                                  Text(
+                                    item['product']?['productname'] ??
+                                        'Unknown',
+                                    style: GoogleFonts.prompt(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  Text(
+                                    'ต้นทุนต่อหน่วย: ฿${(item['unitprice'] as num).toStringAsFixed(2)}',
+                                    style: GoogleFonts.prompt(
+                                      fontSize: 12,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
                             Expanded(
                               flex: 1,
-                              child: Text('x${item['Quantity']}', style: GoogleFonts.prompt(fontSize: 14), textAlign: TextAlign.center),
+                              child: Text(
+                                'x${item['quantity']}',
+                                style: GoogleFonts.prompt(fontSize: 14),
+                                textAlign: TextAlign.center,
+                              ),
                             ),
                             Expanded(
                               flex: 2,
-                              child: Text('฿${((item['UnitPrice'] as num) * (item['Quantity'] as num)).toStringAsFixed(2)}', 
-                                style: GoogleFonts.prompt(fontWeight: FontWeight.bold, fontSize: 14), textAlign: TextAlign.right),
+                              child: Text(
+                                '฿${((item['unitprice'] as num) * (item['quantity'] as num)).toStringAsFixed(2)}',
+                                style: GoogleFonts.prompt(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                                textAlign: TextAlign.right,
+                              ),
                             ),
                           ],
                         ),
@@ -294,12 +374,25 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
                     },
                   ),
                 const Divider(),
-                if (po['BillImagePath'] != null) ...[
+                if (po['billimagepath'] != null) ...[
                   const SizedBox(height: 8),
-                  Text('หลักฐานใบเสร็จ / บิล', style: GoogleFonts.prompt(fontWeight: FontWeight.w600, fontSize: 14)),
+                  Text(
+                    'หลักฐานใบเสร็จ / บิล',
+                    style: GoogleFonts.prompt(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
                   const SizedBox(height: 8),
                   GestureDetector(
-                    onTap: () => _showFullScreenImage(context, po['BillImagePath']),
+                    onTap: () async {
+                      final url = await DatabaseService.instance.getSignedUrl(
+                        po['billimagepath'],
+                      );
+                      if (context.mounted && url != null) {
+                        _showFullScreenImage(context, url);
+                      }
+                    },
                     child: Container(
                       height: 100,
                       width: double.infinity,
@@ -309,20 +402,57 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(12),
-                        child: kIsWeb
-                            ? Image.network(po['BillImagePath'], fit: BoxFit.cover)
-                            : Image.file(File(po['BillImagePath']), fit: BoxFit.cover),
+                        child:
+                            (po['billimagepath'].startsWith('http') ||
+                                po['billimagepath'].startsWith('blob:'))
+                            ? Image.network(
+                                po['billimagepath'],
+                                fit: BoxFit.cover,
+                              )
+                            : FutureBuilder<String?>(
+                                future: DatabaseService.instance.getSignedUrl(
+                                  po['billimagepath'],
+                                ),
+                                builder: (context, snapshot) {
+                                  if (snapshot.connectionState ==
+                                      ConnectionState.waiting) {
+                                    return const Center(
+                                      child: CircularProgressIndicator(),
+                                    );
+                                  }
+                                  if (snapshot.hasData &&
+                                      snapshot.data != null) {
+                                    return Image.network(
+                                      snapshot.data!,
+                                      fit: BoxFit.cover,
+                                    );
+                                  }
+                                  return const Center(
+                                    child: Icon(
+                                      Icons.broken_image,
+                                      color: Colors.grey,
+                                    ),
+                                  );
+                                },
+                              ),
                       ),
                     ),
                   ),
                   const SizedBox(height: 12),
                   const Divider(),
                 ],
-                
+
                 // ประวัติการชำระเงิน (สำหรับบิลเครดิต)
                 if (paymentHistory.isNotEmpty) ...[
                   const SizedBox(height: 8),
-                  Text('ประวัติการชำระเงิน', style: GoogleFonts.prompt(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.blue[800])),
+                  Text(
+                    'ประวัติการชำระเงิน',
+                    style: GoogleFonts.prompt(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: Colors.blue[800],
+                    ),
+                  ),
                   const SizedBox(height: 8),
                   ListView.builder(
                     shrinkWrap: true,
@@ -330,7 +460,7 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
                     itemCount: paymentHistory.length,
                     itemBuilder: (ctx, i) {
                       final pay = paymentHistory[i];
-                      final payDate = DateTime.parse(pay['PaidDate']);
+                      final payDate = DateTime.parse(pay['paiddate']);
                       return Padding(
                         padding: const EdgeInsets.symmetric(vertical: 4.0),
                         child: Row(
@@ -339,15 +469,36 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('฿${(pay['AmountPaid'] as num).toStringAsFixed(2)}', 
-                                  style: GoogleFonts.prompt(fontSize: 13, fontWeight: FontWeight.bold)),
-                                Text(payDate.toString().split('.')[0], style: GoogleFonts.prompt(fontSize: 11, color: Colors.grey)),
+                                Text(
+                                  '฿${(pay['amountpaid'] as num).toStringAsFixed(2)}',
+                                  style: GoogleFonts.prompt(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                Text(
+                                  payDate.toString().split('.')[0],
+                                  style: GoogleFonts.prompt(
+                                    fontSize: 11,
+                                    color: Colors.grey,
+                                  ),
+                                ),
                               ],
                             ),
-                            if (pay['PaidImagePath'] != null)
+                            if (pay['paidimagepath'] != null)
                               IconButton(
-                                icon: const Icon(Icons.image_outlined, size: 20, color: Colors.blue),
-                                onPressed: () => _showFullScreenImage(context, pay['PaidImagePath']),
+                                icon: const Icon(
+                                  Icons.image_outlined,
+                                  size: 20,
+                                  color: Colors.blue,
+                                ),
+                                onPressed: () async {
+                                  final url = await DatabaseService.instance
+                                      .getSignedUrl(pay['paidimagepath']);
+                                  if (context.mounted && url != null) {
+                                    _showFullScreenImage(context, url);
+                                  }
+                                },
                               ),
                           ],
                         ),
@@ -361,26 +512,61 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('ยอดรวมต้นทุน', style: GoogleFonts.prompt(fontWeight: FontWeight.bold, fontSize: 16)),
-                    Text('฿${(po['TotalCost'] as num).toStringAsFixed(2)}', 
-                      style: GoogleFonts.prompt(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.blue)),
+                    Text(
+                      'ยอดรวมต้นทุน',
+                      style: GoogleFonts.prompt(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    Text(
+                      '฿${(po['totalcost'] as num).toStringAsFixed(2)}',
+                      style: GoogleFonts.prompt(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                        color: Colors.blue,
+                      ),
+                    ),
                   ],
                 ),
                 if (!isPaid) ...[
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('ชำระแล้วสะสม', style: GoogleFonts.prompt(fontSize: 14, color: Colors.green[700])),
-                      Text('฿${(po['PaidAmount'] as num).toStringAsFixed(2)}', 
-                        style: GoogleFonts.prompt(fontSize: 14, color: Colors.green[700])),
+                      Text(
+                        'ชำระแล้วสะสม',
+                        style: GoogleFonts.prompt(
+                          fontSize: 14,
+                          color: Colors.green[700],
+                        ),
+                      ),
+                      Text(
+                        '฿${(po['paidamount'] as num).toStringAsFixed(2)}',
+                        style: GoogleFonts.prompt(
+                          fontSize: 14,
+                          color: Colors.green[700],
+                        ),
+                      ),
                     ],
                   ),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('ยอดคงเหลือ', style: GoogleFonts.prompt(fontSize: 14, color: Colors.red)),
-                      Text('฿${((po['TotalCost'] as num) - (po['PaidAmount'] as num)).toStringAsFixed(2)}', 
-                        style: GoogleFonts.prompt(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.red)),
+                      Text(
+                        'ยอดคงเหลือ',
+                        style: GoogleFonts.prompt(
+                          fontSize: 14,
+                          color: Colors.red,
+                        ),
+                      ),
+                      Text(
+                        '฿${((po['totalcost'] as num) - (po['paidamount'] as num)).toStringAsFixed(2)}',
+                        style: GoogleFonts.prompt(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.red,
+                        ),
+                      ),
                     ],
                   ),
                 ],
@@ -391,56 +577,110 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
         actions: [
           if (isConfirmed)
             TextButton(
-              onPressed: () => _confirmCancelPurchase(context, po['POID'], poProvider, productProvider),
-              child: Text('ยกเลิกใบสั่งซื้อ', style: GoogleFonts.prompt(color: Colors.red, fontWeight: FontWeight.bold)),
+              onPressed: () => _confirmCancelPurchase(
+                context,
+                po['poid'],
+                poProvider,
+                productProvider,
+              ),
+              child: Text(
+                'ยกเลิกใบสั่งซื้อ',
+                style: GoogleFonts.prompt(
+                  color: Colors.red,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('ปิด', style: GoogleFonts.prompt(fontWeight: FontWeight.bold)),
+            child: Text(
+              'ปิด',
+              style: GoogleFonts.prompt(fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
     );
   }
 
-  void _confirmCancelPurchase(BuildContext context, String poId, PurchaseOrderProvider poProvider, ProductProvider productProvider) {
+  void _confirmCancelPurchase(
+    BuildContext context,
+    String poId,
+    PurchaseOrderProvider poProvider,
+    ProductProvider productProvider,
+  ) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('ยืนยันการยกเลิก', style: GoogleFonts.prompt(fontWeight: FontWeight.bold)),
-        content: Text('คุณต้องการยกเลิกใบสั่งซื้อนี้ใช่หรือไม่? ระบบจะทำการหักจำนวนสินค้าที่เคยนำเข้าออกจากสต็อกโดยอัตโนมัติ', 
-          style: GoogleFonts.prompt()),
+        title: Text(
+          'ยืนยันการยกเลิก',
+          style: GoogleFonts.prompt(fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          'คุณต้องการยกเลิกใบสั่งซื้อนี้ใช่หรือไม่? ระบบจะทำการหักจำนวนสินค้าที่เคยนำเข้าออกจากสต็อกโดยอัตโนมัติ',
+          style: GoogleFonts.prompt(),
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('ไม่ยกเลิก', style: GoogleFonts.prompt())),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('ไม่ยกเลิก', style: GoogleFonts.prompt()),
+          ),
           TextButton(
             onPressed: () async {
-              Navigator.pop(ctx); 
-              Navigator.pop(context); 
-              
+              // เก็บ navigator ไว้ก่อนเผื่อ context ไม่ปลอดภัยหลัง async
+              final navigator = Navigator.of(context);
+
+              Navigator.pop(ctx); // ปิด AlertDialog ยืนยัน
+
+              // แสดง Loading
               showDialog(
                 context: context,
                 barrierDismissible: false,
-                builder: (c) => const Center(child: CircularProgressIndicator()),
+                builder: (c) =>
+                    const Center(child: CircularProgressIndicator()),
               );
 
-              final success = await DatabaseService.instance.cancelPurchaseOrder(poId);
-              
+              final success = await DatabaseService.instance
+                  .cancelPurchaseOrder(poId);
+
               if (!mounted) return;
-              Navigator.pop(context); 
+
+              // ปิด Loading
+              navigator.pop();
+              // ปิดหน้ารายละเอียดใบสั่งซื้อ
+              navigator.pop();
 
               if (success) {
                 await poProvider.loadPurchaseHistory();
                 await productProvider.loadProductsFromDatabase();
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('ยกเลิกใบสั่งซื้อและหักสต็อกคืนสำเร็จ', style: GoogleFonts.prompt()), backgroundColor: Colors.orange),
+                  SnackBar(
+                    content: Text(
+                      'ยกเลิกใบสั่งซื้อและหักสต็อกคืนสำเร็จ',
+                      style: GoogleFonts.prompt(),
+                    ),
+                    backgroundColor: Colors.orange,
+                  ),
                 );
               } else {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('ไม่สามารถยกเลิกได้', style: GoogleFonts.prompt()), backgroundColor: Colors.red),
+                  SnackBar(
+                    content: Text(
+                      'ไม่สามารถยกเลิกได้',
+                      style: GoogleFonts.prompt(),
+                    ),
+                    backgroundColor: Colors.red,
+                  ),
                 );
               }
             },
-            child: Text('ยืนยันยกเลิก', style: GoogleFonts.prompt(color: Colors.red, fontWeight: FontWeight.bold)),
+            child: Text(
+              'ยืนยันยกเลิก',
+              style: GoogleFonts.prompt(
+                color: Colors.red,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),

@@ -139,15 +139,25 @@ class _PurchaseOrderScreenState extends State<PurchaseOrderScreen> {
               ],
             ),
           ),
+          /*
           Text(
             '฿${po.totalAmount.toStringAsFixed(2)}',
             style: GoogleFonts.prompt(fontSize: 18, fontWeight: FontWeight.bold),
           ),
+          */
           const SizedBox(width: 12),
           ElevatedButton(
             onPressed: po.itemCount == 0 
                 ? null 
-                : () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PurchaseOrderCartScreen())),
+                : () async {
+                    final result = await Navigator.push(
+                      context, 
+                      MaterialPageRoute(builder: (_) => const PurchaseOrderCartScreen())
+                    );
+                    if (result == true && context.mounted) {
+                      Navigator.pop(context);
+                    }
+                  },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF1E2736),
               foregroundColor: Colors.white,

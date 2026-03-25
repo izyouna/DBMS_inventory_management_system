@@ -11,6 +11,7 @@ class Order {
   final bool isPaid;
   final String orderStatus; // Confirmed, Cancelled
   final Customer? customer;
+  final DateTime? dueDate;
 
   Order({
     required this.id,
@@ -22,32 +23,64 @@ class Order {
     this.isPaid = true,
     this.orderStatus = 'Confirmed',
     this.customer,
+    this.dueDate,
   });
 
   String get documentName => documentType == DocumentType.receipt ? 'ใบเสร็จรับเงิน' : 'ใบแจ้งหนี้';
 
-  // แปลงจาก Map (Database) มาเป็น Order Object (รองรับโครงสร้าง v8)
+  // แปลงจาก Map (Database) มาเป็น Order Object
   factory Order.fromMap(Map<String, dynamic> map, List<CartItem> items) {
     Customer? customer;
-    if (map['CustomerName'] != null) {
-      customer = Customer(
-        id: '', // ไม่ได้ใช้ id สำหรับกรณีนี้
-        name: map['CustomerName'],
-        phone: map['Phone'] ?? '',
-      );
+    DateTime? dueDate;
+    
+    // Handle joined debtrecord
+    final debtRecord = map['debtrecord'];
+    if (debtRecord != null) {
+      // Supabase join might return a list or a map
+      final record = (debtRecord is List && debtRecord.isNotEmpty) ? debtRecord.first : debtRecord;
+      if (record is Map) {
+        if (record['due_date'] != null) {
+          dueDate = DateTime.parse(record['due_date']);
+        }
+
+        final customerData = record['customer'];
+        if (customerData != null) {
+          customer = Customer(
+            id: (record['customerid'] ?? record['id'])?.toString() ?? '',
+            name: customerData['customername'] ?? '',
+            phone: customerData['customerphone'] ?? '',
+          );
+        } else if (record['customername'] != null) {
+          // Fallback if it was somehow flat (though our query is nested now)
+          customer = Customer(
+            id: (record['customerid'] ?? record['id'])?.toString() ?? '',
+            name: record['customername'] ?? '',
+            phone: record['customerphone'] ?? '',
+          );
+        }
+      }
     }
 
+    // Handle joined paymenttype
+    String paymentMethodName = 'ไม่ระบุ';
+    final paymentType = map['paymenttype'];
+    if (paymentType != null) {
+      paymentMethodName = paymentType['paymentname'] ?? 'ไม่ระบุ';
+    }
+
+    final paymentStatus = map['paymentstatus'];
+
     return Order(
-      id: map['OrderID'].toString(),
+      id: (map['order_id'] ?? '').toString(), 
       items: items,
-      totalAmount: (map['TotalAmount'] ?? 0).toDouble(),
-      dateTime: DateTime.parse(map['OrderDate']),
-      paymentMethod: map['TypeName'] ?? 'ไม่ระบุ',
-      // ใช้ PaymentStatus แทน Status เดิม
-      documentType: map['PaymentStatus'] == 'ค้างชำระ' ? DocumentType.invoice : DocumentType.receipt,
-      isPaid: map['PaymentStatus'] != 'ค้างชำระ',
-      orderStatus: map['OrderStatus'] ?? 'Confirmed',
+      totalAmount: (map['totalamount'] ?? 0).toDouble(),
+      dateTime: DateTime.parse(map['orderdate']),
+      paymentMethod: paymentMethodName,
+      documentType: paymentStatus == 'ค้างชำระ' ? DocumentType.invoice : DocumentType.receipt,
+      isPaid: paymentStatus != 'ค้างชำระ',
+      orderStatus: map['status'] ?? 'Confirmed', 
       customer: customer, 
+      dueDate: dueDate,
     );
   }
 }

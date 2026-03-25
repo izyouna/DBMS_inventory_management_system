@@ -1,25 +1,12 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../models/product.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/database_service.dart';
 
 class ProductProvider with ChangeNotifier {
-  final List<ProductCategory> _categories = [
-    ProductCategory(id: 'cat1', label: 'ปุ๋ย'),
-    ProductCategory(id: 'cat2', label: 'ยาฆ่าแมลง'),
-    ProductCategory(id: 'cat3', label: 'เมล็ดพันธุ์'),
-    ProductCategory(id: 'cat4', label: 'อุปกรณ์'),
-    ProductCategory(id: 'cat5', label: 'ทั่วไป'),
-  ];
+  List<ProductCategory> _categories = [];
 
-  final List<ProductUnit> _units = [
-    ProductUnit(id: 'u1', label: 'ชิ้น'),
-    ProductUnit(id: 'u2', label: 'กระสอบ'),
-    ProductUnit(id: 'u3', label: 'ขวด'),
-    ProductUnit(id: 'u4', label: 'กล่อง'),
-    ProductUnit(id: 'u5', label: 'ถุง'),
-  ];
+  List<ProductUnit> _units = [];
 
   List<Warehouse> _warehouses = [];
   List<Product> _products = [];
@@ -28,64 +15,56 @@ class ProductProvider with ChangeNotifier {
     loadProductsFromDatabase();
   }
 
+  bool _isLoading = false;
+  bool get isLoading => _isLoading;
+
   // ฟังก์ชันโหลดข้อมูลจากฐานข้อมูล
-  Future<void> loadProductsFromDatabase() async {
+  Future<void> loadProductsFromDatabase({bool force = false}) async {
+    if (_isLoading && !force) return;
+    _isLoading = true;
+    if (force) notifyListeners(); // แจ้ง UI ว่ากำลังเริ่มโหลดใหม่จริงๆ
+    
     try {
-      // 1. โหลด Warehouses ก่อน
-      final dbWarehouses = await DatabaseService.instance.getWarehouses();
+      debugPrint("--- Start Loading Products (Force: $force) ---");
+      
+      // ดึงข้อมูลทั้งหมดแบบขนานเพื่อความเร็ว
+      final results = await Future.wait([
+        DatabaseService.instance.getCategories(),
+        DatabaseService.instance.getProductUnits(),
+        DatabaseService.instance.getWarehouses(),
+        DatabaseService.instance.getProducts(),
+      ]);
+
+      final dbCategories = results[0] as List<Map<String, dynamic>>;
+      final dbUnits = results[1] as List<Map<String, dynamic>>;
+      final dbWarehouses = results[2] as List<Map<String, dynamic>>;
+      final dbProducts = results[3] as List<Map<String, dynamic>>;
+
+      _categories = dbCategories.map((map) => ProductCategory.fromMap(map)).toList();
+      _units = dbUnits.map((map) => ProductUnit.fromMap(map)).toList();
       _warehouses = dbWarehouses.map((map) => Warehouse.fromMap(map)).toList();
 
-      // 2. โหลด Products
-      final dbProducts = await DatabaseService.instance.getProducts();
+      _products = dbProducts
+          .map((map) {
+            try {
+              return Product.fromMap(map, _categories, _units);
+            } catch (e) {
+              debugPrint("Error parsing product: $e | Data: $map");
+              return null;
+            }
+          })
+          .whereType<Product>()
+          .toList();
       
-      if (dbProducts.isEmpty) {
-        // ถ้าฐานข้อมูลว่าง พยายามสร้างสินค้าตัวอย่างลง DB
-        if (!kIsWeb) {
-          await _setInitialProducts();
-          final updatedDbProducts = await DatabaseService.instance.getProducts();
-          if (updatedDbProducts.isNotEmpty) {
-            _products = updatedDbProducts.map((map) => Product.fromMap(map, _categories, _units)).toList();
-          }
-        } else {
-          _setInitialFallback();
-        }
-      } else {
-        _products = dbProducts.map((map) => Product.fromMap(map, _categories, _units)).toList();
-      }
-      notifyListeners();
+      debugPrint("Successfully loaded ${_products.length} products");
+      debugPrint("--- Finish Loading Products ---");
+
     } catch (e) {
-      debugPrint("Error loading products: $e");
-      _setInitialFallback();
+      debugPrint("Critical error loading products: $e");
+    } finally {
+      _isLoading = false;
       notifyListeners();
     }
-  }
-
-  void _setInitialFallback() {
-    // ข้อมูลสำรองหากโหลดไม่ได้
-    _products = [
-      Product(
-        id: 'P1',
-        name: 'ปุ๋ยอินทรีย์ 50kg',
-        price: 450.0,
-        stock: 10,
-        unit: _units[1],
-        category: _categories[0],
-        warehouse: _warehouses.isNotEmpty ? _warehouses[0] : null,
-      ),
-    ];
-  }
-
-  Future<void> _setInitialProducts() async {
-    if (_warehouses.isEmpty) return;
-    
-    await DatabaseService.instance.addProduct(
-      name: 'ปุ๋ยอินทรีย์ 50kg',
-      price: 450.0,
-      stock: 10,
-      unit: _units[1].label,
-      category: _categories[0].label,
-      warehouseId: _warehouses[0].id,
-    );
   }
 
   List<Product> get products => _products;
@@ -119,16 +98,36 @@ class ProductProvider with ChangeNotifier {
     }
 
     try {
+      String? finalImagePath = updatedProduct.imagePath;
+
+      // If a new image was picked, upload it first
+      if (_productImage != null) {
+        debugPrint("Uploading new image for product: ${updatedProduct.name}");
+        final uploadedUrl = await DatabaseService.instance.uploadProductImage(_productImage!);
+        if (uploadedUrl != null) {
+          finalImagePath = uploadedUrl;
+          // Update the local object with the real URL
+          if (index != -1) {
+            _products[index].id = updatedProduct.id; // ensure consistency
+            // Note: In a real app, we might want to update the local product again
+          }
+        }
+      }
+
       await DatabaseService.instance.updateProduct(
         id: updatedProduct.id,
         name: updatedProduct.name,
-        category: updatedProduct.category.label,
-        stock: updatedProduct.stock,
+        categoryId: updatedProduct.category.id,
+        // ไม่ส่ง stock ไปเพื่อป้องกันการเขียนทับด้วยข้อมูลเก่า
         price: updatedProduct.price,
-        unit: updatedProduct.unit.label,
-        imagePath: updatedProduct.imagePath,
+        markupPercentage: updatedProduct.markupPercentage,
+        unitId: updatedProduct.unit.id,
+        imagePath: finalImagePath,
         warehouseId: updatedProduct.warehouse?.id,
       );
+      
+      // Reload from DB to ensure local state matches server (especially URLs)
+      loadProductsFromDatabase();
     } catch (e) {
       debugPrint("Error updating database: $e");
     }
@@ -142,30 +141,6 @@ class ProductProvider with ChangeNotifier {
     }
     _products.removeWhere((p) => p.id == id);
     notifyListeners();
-  }
-
-  void reduceStock(String productId, int quantity) async {
-    final index = _products.indexWhere((p) => p.id == productId);
-    if (index != -1) {
-      final newStock = _products[index].stock - quantity;
-      _products[index].stock = newStock < 0 ? 0 : newStock;
-      notifyListeners();
-
-      try {
-        await DatabaseService.instance.updateProduct(
-          id: productId,
-          name: _products[index].name,
-          category: _products[index].category.label,
-          stock: _products[index].stock,
-          price: _products[index].price,
-          unit: _products[index].unit.label,
-          imagePath: _products[index].imagePath,
-          warehouseId: _products[index].warehouse?.id,
-        );
-      } catch (e) {
-        debugPrint("Error updating stock in DB: $e");
-      }
-    }
   }
 
   int get lowStockCount => _products.where((p) => p.isLowStock).length;

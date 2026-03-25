@@ -1,10 +1,12 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
 import '../providers/purchase_order_provider.dart';
+import '../services/database_service.dart';
 
 class DebtReportScreen extends StatefulWidget {
   const DebtReportScreen({super.key});
@@ -17,7 +19,6 @@ class _DebtReportScreenState extends State<DebtReportScreen> {
   @override
   void initState() {
     super.initState();
-    // โหลดข้อมูลล่าสุดเมื่อเข้าหน้าจอ
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<CartProvider>(context, listen: false).loadOrdersFromDatabase();
       Provider.of<CartProvider>(context, listen: false).loadDebtRecords();
@@ -32,7 +33,7 @@ class _DebtReportScreenState extends State<DebtReportScreen> {
       child: Scaffold(
         backgroundColor: const Color(0xFFF5F6FA),
         appBar: AppBar(
-          title: Text('รายการค้างชำระ', style: GoogleFonts.prompt(fontWeight: FontWeight.bold)),
+          title: Text('บริหารรายการค้างชำระ', style: GoogleFonts.prompt(fontWeight: FontWeight.bold)),
           backgroundColor: Colors.white,
           foregroundColor: Colors.black,
           elevation: 0,
@@ -42,8 +43,8 @@ class _DebtReportScreenState extends State<DebtReportScreen> {
             indicatorColor: const Color(0xFF1E2736),
             labelStyle: GoogleFonts.prompt(fontWeight: FontWeight.bold),
             tabs: const [
-              Tab(text: 'ลูกหนี้ (เงินเข้า)', icon: Icon(Icons.person_outline)),
-              Tab(text: 'เจ้าหนี้ (เงินออก)', icon: Icon(Icons.business_outlined)),
+              Tab(text: 'ลูกหนี้ (เงินเข้า)', icon: Icon(Icons.person_pin_outlined)),
+              Tab(text: 'เจ้าหนี้ (เงินออก)', icon: Icon(Icons.account_balance_outlined)),
             ],
           ),
         ),
@@ -64,13 +65,13 @@ class DebtorListView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cartProvider = Provider.of<CartProvider>(context);
-    final debtRecords = cartProvider.debtRecords.where((d) => d['DeptStatus'] == 'Pending').toList();
+    final debtRecords = cartProvider.debtRecords.where((d) => d['debtstatus'] == 'Pending').toList();
 
-    // จัดเรียงตามชื่อ CustomerName (ก-ฮ, A-Z)
+    // จัดเรียง: เกินกำหนดขึ้นก่อน ตามด้วยใกล้ถึงกำหนด
     debtRecords.sort((a, b) {
-      String nameA = (a['CustomerName'] ?? '').toString();
-      String nameB = (b['CustomerName'] ?? '').toString();
-      return nameA.compareTo(nameB);
+      final dueA = a['due_date'] != null ? DateTime.parse(a['due_date']) : DateTime.now().add(const Duration(days: 365));
+      final dueB = b['due_date'] != null ? DateTime.parse(b['due_date']) : DateTime.now().add(const Duration(days: 365));
+      return dueA.compareTo(dueB);
     });
 
     return RefreshIndicator(
@@ -82,32 +83,80 @@ class DebtorListView extends StatelessWidget {
               itemCount: debtRecords.length,
               itemBuilder: (ctx, i) {
                 final debt = debtRecords[i];
-                final date = DateTime.parse(debt['StartDate']);
-                final total = (debt['OriginalAmount'] as num).toDouble();
-                final balance = (debt['RemainingAmount'] as num).toDouble();
+                final startDate = DateTime.parse(debt['startdate']);
+                final dueDate = debt['due_date'] != null ? DateTime.parse(debt['due_date']) : null;
+                final total = (debt['originalamount'] as num).toDouble();
+                final balance = (debt['remainingamount'] as num).toDouble();
                 final paid = total - balance;
+                final customer = debt['customer'];
+                
+                final bool isOverdue = dueDate != null && dueDate.isBefore(DateTime.now()) && balance > 0;
 
                 return Card(
                   margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(color: isOverdue ? Colors.red.withOpacity(0.3) : Colors.transparent, width: 1),
+                  ),
                   child: Column(
                     children: [
+                      if (isOverdue)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          decoration: const BoxDecoration(
+                            color: Colors.red,
+                            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                          ),
+                          child: Text('เกินกำหนดชำระ', 
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.prompt(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                        ),
                       ListTile(
-                        onTap: () => _showDebtPaymentHistory(context, debt['DebtID'], cartProvider),
-                        title: Text(debt['CustomerName'] ?? 'ไม่ระบุชื่อ', style: GoogleFonts.prompt(fontWeight: FontWeight.bold)),
+                        contentPadding: const EdgeInsets.all(16),
+                        onTap: () => _showDebtPaymentHistory(context, debt['debtid'], cartProvider),
+                        title: Row(
+                          children: [
+                            Text(customer?['customername'] ?? 'ไม่ระบุชื่อลูกค้า', 
+                              style: GoogleFonts.prompt(fontWeight: FontWeight.bold, fontSize: 16)),
+                            const SizedBox(width: 8),
+                            if (isOverdue) const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 18),
+                          ],
+                        ),
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('โทร: ${debt['Phone'] ?? '-'}', style: GoogleFonts.prompt(fontSize: 12)),
-                            Text('วันที่: ${date.toString().split('.')[0]}', style: GoogleFonts.prompt(fontSize: 12)),
+                            Text('โทร: ${customer?['customerphone'] ?? '-'}', style: GoogleFonts.prompt(fontSize: 12)),
                             const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Icon(Icons.calendar_today, size: 12, color: Colors.grey[600]),
+                                const SizedBox(width: 4),
+                                Text('วันที่ขาย: ${startDate.day}/${startDate.month}/${startDate.year}', 
+                                  style: GoogleFonts.prompt(fontSize: 11, color: Colors.grey[600])),
+                              ],
+                            ),
+                            if (dueDate != null)
+                              Row(
+                                children: [
+                                  Icon(Icons.event_available, size: 12, color: isOverdue ? Colors.red : Colors.green[700]),
+                                  const SizedBox(width: 4),
+                                  Text('ครบกำหนด: ${dueDate.day}/${dueDate.month}/${dueDate.year}', 
+                                    style: GoogleFonts.prompt(
+                                      fontSize: 11, 
+                                      fontWeight: isOverdue ? FontWeight.bold : FontWeight.normal,
+                                      color: isOverdue ? Colors.red : Colors.green[700])),
+                                ],
+                              ),
+                            const SizedBox(height: 12),
                             ClipRRect(
                               borderRadius: BorderRadius.circular(10),
                               child: LinearProgressIndicator(
                                 value: total > 0 ? (paid / total) : 0,
-                                backgroundColor: Colors.grey[200],
-                                color: Colors.blue,
-                                minHeight: 6,
+                                backgroundColor: Colors.grey[100],
+                                color: isOverdue ? Colors.red[400] : Colors.blue,
+                                minHeight: 8,
                               ),
                             ),
                           ],
@@ -116,23 +165,32 @@ class DebtorListView extends StatelessWidget {
                           mainAxisAlignment: MainAxisAlignment.center,
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            Text('ยอดคงค้าง: ฿${balance.toStringAsFixed(2)}', 
-                              style: GoogleFonts.prompt(color: Colors.red, fontWeight: FontWeight.bold)),
-                            Text('ยอดเดิม: ฿${total.toStringAsFixed(2)}', 
-                              style: GoogleFonts.prompt(fontSize: 10, color: Colors.grey)),
+                            Text('฿${balance.toStringAsFixed(2)}', 
+                              style: GoogleFonts.prompt(
+                                color: isOverdue ? Colors.red : const Color(0xFF1E2736), 
+                                fontWeight: FontWeight.bold, 
+                                fontSize: 18)),
+                            Text('ค้างชำระ', style: GoogleFonts.prompt(fontSize: 10, color: Colors.grey)),
                           ],
                         ),
                       ),
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                         child: Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            TextButton.icon(
-                              onPressed: () => _showDebtPaymentDialog(context, debt['DebtID'], balance, cartProvider),
-                              icon: const Icon(Icons.payments_outlined, size: 18),
-                              label: Text('รับชำระหนี้', style: GoogleFonts.prompt()),
-                              style: TextButton.styleFrom(foregroundColor: Colors.green[800]),
+                            Text('ยอดเดิม: ฿${total.toStringAsFixed(2)}', 
+                              style: GoogleFonts.prompt(fontSize: 12, color: Colors.grey[600])),
+                            ElevatedButton.icon(
+                              onPressed: () => _showDebtPaymentDialog(context, debt['debtid'], balance, cartProvider),
+                              icon: const Icon(Icons.payments_outlined, size: 16),
+                              label: Text('รับชำระหนี้', style: GoogleFonts.prompt(fontWeight: FontWeight.bold)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: isOverdue ? Colors.red[50] : Colors.green[50],
+                                foregroundColor: isOverdue ? Colors.red : Colors.green[800],
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
                             ),
                           ],
                         ),
@@ -147,7 +205,7 @@ class DebtorListView extends StatelessWidget {
 
   void _showDebtPaymentDialog(BuildContext context, String debtId, double balance, CartProvider provider) {
     final amountController = TextEditingController();
-    File? pickedImage;
+    XFile? pickedFile;
     final picker = ImagePicker();
 
     showDialog(
@@ -175,9 +233,9 @@ class DebtorListView extends StatelessWidget {
                 const SizedBox(height: 16),
                 GestureDetector(
                   onTap: () async {
-                    final pickedFile = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
-                    if (pickedFile != null) {
-                      setDialogState(() => pickedImage = File(pickedFile.path));
+                    final result = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+                    if (result != null) {
+                      setDialogState(() => pickedFile = result);
                     }
                   },
                   child: Container(
@@ -188,10 +246,12 @@ class DebtorListView extends StatelessWidget {
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: Colors.grey[300]!),
                     ),
-                    child: pickedImage != null
+                    child: pickedFile != null
                         ? ClipRRect(
                             borderRadius: BorderRadius.circular(12),
-                            child: Image.file(pickedImage!, fit: BoxFit.cover),
+                            child: kIsWeb 
+                                ? Image.network(pickedFile!.path, fit: BoxFit.cover)
+                                : Image.file(File(pickedFile!.path), fit: BoxFit.cover),
                           )
                         : Column(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -209,7 +269,7 @@ class DebtorListView extends StatelessWidget {
             TextButton(onPressed: () => Navigator.pop(ctx), child: Text('ยกเลิก', style: GoogleFonts.prompt())),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green[700],
+                backgroundColor: const Color(0xFF1E2736),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
               onPressed: () async {
@@ -224,7 +284,7 @@ class DebtorListView extends StatelessWidget {
                 await provider.addDebtPayment(
                   debtId: debtId,
                   amount: amount,
-                  imagePath: pickedImage?.path,
+                  image: pickedFile,
                 );
 
                 if (!context.mounted) return;
@@ -278,7 +338,7 @@ class DebtorListView extends StatelessWidget {
                       separatorBuilder: (_, __) => const Divider(),
                       itemBuilder: (c, i) {
                         final item = history[i];
-                        final date = DateTime.parse(item['PaidDate']);
+                        final date = DateTime.parse(item['paiddate']);
                         return ListTile(
                           leading: Container(
                             width: 40,
@@ -286,17 +346,23 @@ class DebtorListView extends StatelessWidget {
                             decoration: BoxDecoration(color: Colors.blue[50], borderRadius: BorderRadius.circular(8)),
                             child: Icon(Icons.account_balance_wallet, color: Colors.blue[700]),
                           ),
-                          title: Text('฿${(item['AmountPaid'] as num).toStringAsFixed(2)}', 
+                          title: Text('฿${(item['amountpaid'] as num).toStringAsFixed(2)}', 
                             style: GoogleFonts.prompt(fontWeight: FontWeight.bold)),
                           subtitle: Text('วันที่: ${date.toString().split('.')[0]}', style: GoogleFonts.prompt(fontSize: 12)),
-                          trailing: item['DeptPaidImagePath'] != null
+                          trailing: item['deptpaidimagepath'] != null
                               ? IconButton(
                                   icon: const Icon(Icons.image_outlined, color: Colors.blue),
-                                  onPressed: () => _showFullScreenImage(context, item['DeptPaidImagePath']),
+                                  onPressed: () async {
+                                    final url = await DatabaseService.instance.getSignedUrl(item['deptpaidimagepath']);
+                                    if (context.mounted && url != null) {
+                                      _showFullScreenImage(context, url);
+                                    }
+                                  },
                                 )
                               : null,
                         );
                       },
+
                     ),
             ),
           ],
@@ -313,7 +379,11 @@ class DebtorListView extends StatelessWidget {
         child: Stack(
           alignment: Alignment.center,
           children: [
-            InteractiveViewer(child: Image.file(File(imagePath))),
+            InteractiveViewer(
+              child: (imagePath.startsWith('http') || imagePath.startsWith('blob:'))
+                  ? Image.network(imagePath)
+                  : Image.file(File(imagePath)),
+            ),
             Positioned(
               top: 0, 
               right: 0, 
@@ -336,8 +406,15 @@ class CreditorListView extends StatelessWidget {
   Widget build(BuildContext context) {
     final poProvider = Provider.of<PurchaseOrderProvider>(context);
     final unpaidPOs = poProvider.purchaseHistory
-        .where((po) => po['Status'] == 'Confirmed' && po['PaymentStatus'] == 'Pending')
+        .where((po) => po['status'] == 'Confirmed' && po['paymentstatus'] == 'Pending')
         .toList();
+
+    // จัดเรียง: เกินกำหนดขึ้นก่อน
+    unpaidPOs.sort((a, b) {
+      final dueA = a['due_date'] != null ? DateTime.parse(a['due_date']) : DateTime.now().add(const Duration(days: 365));
+      final dueB = b['due_date'] != null ? DateTime.parse(b['due_date']) : DateTime.now().add(const Duration(days: 365));
+      return dueA.compareTo(dueB);
+    });
 
     return RefreshIndicator(
       onRefresh: () => poProvider.loadPurchaseHistory(),
@@ -366,33 +443,75 @@ class CreditorListView extends StatelessWidget {
               itemCount: unpaidPOs.length,
               itemBuilder: (ctx, i) {
                 final po = unpaidPOs[i];
-                final date = DateTime.parse(po['ReceiveDate']);
-                final total = (po['TotalCost'] as num).toDouble();
-                final paid = (po['PaidAmount'] as num).toDouble();
+                final date = DateTime.parse(po['receivedate']);
+                final dueDate = po['due_date'] != null ? DateTime.parse(po['due_date']) : null;
+                final total = (po['totalcost'] as num).toDouble();
+                final paid = (po['paidamount'] as num).toDouble();
                 final balance = total - paid;
+                
+                final bool isOverdue = dueDate != null && dueDate.isBefore(DateTime.now()) && balance > 0;
 
                 return Card(
                   margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(color: isOverdue ? Colors.red.withOpacity(0.3) : Colors.transparent, width: 1),
+                  ),
                   child: Column(
                     children: [
+                      if (isOverdue)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          decoration: const BoxDecoration(
+                            color: Colors.orange,
+                            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                          ),
+                          child: Text('เกินกำหนดชำระให้ Supplier', 
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.prompt(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                        ),
                       ListTile(
-                        onTap: () => _showPaymentHistory(context, po['POID'], poProvider),
-                        title: Text('PO ID: ${po['POID']}', 
+                        contentPadding: const EdgeInsets.all(16),
+                        onTap: () => _showPaymentHistory(context, po['poid'], poProvider),
+                        title: Text('PO ID: ${po['poid']}', 
                           overflow: TextOverflow.ellipsis,
                           style: GoogleFonts.prompt(fontWeight: FontWeight.bold)),
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('วันที่: ${date.toString().split('.')[0]}', style: GoogleFonts.prompt(fontSize: 12)),
+                            Text('ผู้จัดจำหน่าย: ${po['supplier']?['supplier_name'] ?? 'ไม่ระบุ'}', 
+                              style: GoogleFonts.prompt(fontSize: 12)),
                             const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Icon(Icons.calendar_today, size: 12, color: Colors.grey[600]),
+                                const SizedBox(width: 4),
+                                Text('วันที่รับ: ${date.day}/${date.month}/${date.year}', 
+                                  style: GoogleFonts.prompt(fontSize: 11)),
+                              ],
+                            ),
+                            if (dueDate != null)
+                              Row(
+                                children: [
+                                  Icon(Icons.timer, size: 12, color: isOverdue ? Colors.red : Colors.blue),
+                                  const SizedBox(width: 4),
+                                  Text('ต้องจ่ายภายใน: ${dueDate.day}/${dueDate.month}/${dueDate.year}', 
+                                    style: GoogleFonts.prompt(
+                                      fontSize: 11, 
+                                      fontWeight: isOverdue ? FontWeight.bold : FontWeight.normal,
+                                      color: isOverdue ? Colors.red : Colors.blue)),
+                                ],
+                              ),
+                            const SizedBox(height: 12),
                             ClipRRect(
                               borderRadius: BorderRadius.circular(10),
                               child: LinearProgressIndicator(
                                 value: total > 0 ? (paid / total) : 0,
-                                backgroundColor: Colors.grey[200],
+                                backgroundColor: Colors.grey[100],
                                 color: Colors.green,
-                                minHeight: 6,
+                                minHeight: 8,
                               ),
                             ),
                           ],
@@ -401,23 +520,28 @@ class CreditorListView extends StatelessWidget {
                           mainAxisAlignment: MainAxisAlignment.center,
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            Text('คงค้าง: ฿${balance.toStringAsFixed(2)}', 
-                              style: GoogleFonts.prompt(color: Colors.red, fontWeight: FontWeight.bold)),
+                            Text('฿${balance.toStringAsFixed(2)}', 
+                              style: GoogleFonts.prompt(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 18)),
                             Text('จ่ายแล้ว: ฿${paid.toStringAsFixed(2)}', 
                               style: GoogleFonts.prompt(fontSize: 10, color: Colors.green[700])),
                           ],
                         ),
                       ),
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
-                            TextButton.icon(
-                              onPressed: () => _showPaymentDialog(context, po['POID'], balance, poProvider),
-                              icon: const Icon(Icons.add_card, size: 18),
-                              label: Text('ชำระเงินรายครั้ง', style: GoogleFonts.prompt()),
-                              style: TextButton.styleFrom(foregroundColor: Colors.blue[800]),
+                            ElevatedButton.icon(
+                              onPressed: () => _showPaymentDialog(context, po['poid'], balance, poProvider),
+                              icon: const Icon(Icons.add_card, size: 16),
+                              label: Text('ชำระเงิน', style: GoogleFonts.prompt(fontWeight: FontWeight.bold)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF1E2736),
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
                             ),
                           ],
                         ),
@@ -432,7 +556,7 @@ class CreditorListView extends StatelessWidget {
 
   void _showPaymentDialog(BuildContext context, String poId, double balance, PurchaseOrderProvider provider) {
     final amountController = TextEditingController();
-    File? pickedImage;
+    XFile? pickedFile;
     final picker = ImagePicker();
 
     showDialog(
@@ -460,9 +584,9 @@ class CreditorListView extends StatelessWidget {
                 const SizedBox(height: 16),
                 GestureDetector(
                   onTap: () async {
-                    final pickedFile = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
-                    if (pickedFile != null) {
-                      setDialogState(() => pickedImage = File(pickedFile.path));
+                    final result = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+                    if (result != null) {
+                      setDialogState(() => pickedFile = result);
                     }
                   },
                   child: Container(
@@ -473,10 +597,12 @@ class CreditorListView extends StatelessWidget {
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: Colors.grey[300]!),
                     ),
-                    child: pickedImage != null
+                    child: pickedFile != null
                         ? ClipRRect(
                             borderRadius: BorderRadius.circular(12),
-                            child: Image.file(pickedImage!, fit: BoxFit.cover),
+                            child: kIsWeb 
+                                ? Image.network(pickedFile!.path, fit: BoxFit.cover)
+                                : Image.file(File(pickedFile!.path), fit: BoxFit.cover),
                           )
                         : Column(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -509,7 +635,7 @@ class CreditorListView extends StatelessWidget {
                 await provider.addPayment(
                   poId: poId,
                   amount: amount,
-                  imagePath: pickedImage?.path,
+                  image: pickedFile,
                 );
 
                 if (!context.mounted) return;
@@ -563,7 +689,7 @@ class CreditorListView extends StatelessWidget {
                       separatorBuilder: (_, __) => const Divider(),
                       itemBuilder: (c, i) {
                         final item = history[i];
-                        final date = DateTime.parse(item['PaidDate']);
+                        final date = DateTime.parse(item['paiddate']);
                         return ListTile(
                           leading: Container(
                             width: 40,
@@ -571,17 +697,23 @@ class CreditorListView extends StatelessWidget {
                             decoration: BoxDecoration(color: Colors.green[50], borderRadius: BorderRadius.circular(8)),
                             child: Icon(Icons.check, color: Colors.green[700]),
                           ),
-                          title: Text('฿${(item['AmountPaid'] as num).toStringAsFixed(2)}', 
+                          title: Text('฿${(item['amountpaid'] as num).toStringAsFixed(2)}', 
                             style: GoogleFonts.prompt(fontWeight: FontWeight.bold)),
                           subtitle: Text('วันที่: ${date.toString().split('.')[0]}', style: GoogleFonts.prompt(fontSize: 12)),
-                          trailing: item['PaidImagePath'] != null
+                          trailing: item['paidimagepath'] != null
                               ? IconButton(
                                   icon: const Icon(Icons.image_outlined, color: Colors.blue),
-                                  onPressed: () => _showFullScreenImage(context, item['PaidImagePath']),
+                                  onPressed: () async {
+                                    final url = await DatabaseService.instance.getSignedUrl(item['paidimagepath']);
+                                    if (context.mounted && url != null) {
+                                      _showFullScreenImage(context, url);
+                                    }
+                                  },
                                 )
                               : null,
                         );
                       },
+
                     ),
             ),
           ],
@@ -598,7 +730,11 @@ class CreditorListView extends StatelessWidget {
         child: Stack(
           alignment: Alignment.center,
           children: [
-            InteractiveViewer(child: Image.file(File(imagePath))),
+            InteractiveViewer(
+              child: (imagePath.startsWith('http') || imagePath.startsWith('blob:'))
+                  ? Image.network(imagePath)
+                  : Image.file(File(imagePath)),
+            ),
             Positioned(
               top: 0, 
               right: 0, 

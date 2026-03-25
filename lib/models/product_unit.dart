@@ -4,7 +4,14 @@ class ProductUnit {
 
   ProductUnit({required this.id, required this.label});
 
-  Map<String, dynamic> toMap() => {'id': id, 'label': label};
+  Map<String, dynamic> toMap() => {
+    'unitid': id,
+    'unitname': label,
+  };
+
   factory ProductUnit.fromMap(Map<String, dynamic> map) => 
-      ProductUnit(id: map['id'], label: map['label']);
+      ProductUnit(
+        id: (map['unitid'] ?? map['UnitID'])?.toString() ?? '', 
+        label: map['unitname'] ?? map['UnitName'] ?? ''
+      );
 }

@@ -35,6 +35,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
     final nameController = TextEditingController(text: product.name);
     final stockController = TextEditingController(text: product.stock.toString());
     final priceController = TextEditingController(text: product.price.toString());
+    final markupController = TextEditingController(text: product.markupPercentage.toStringAsFixed(0));
 
     // ดึงรูปเดิมมาแสดงใน Provider
     provider.setImageFromPath(product.imagePath);
@@ -107,11 +108,23 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     const SizedBox(height: 16),
                     Row(
                       children: [
-                        Expanded(child: TextField(controller: stockController, keyboardType: TextInputType.number, decoration: _inputDecoration('จำนวน'))),
+                        Expanded(
+                          child: TextFormField(
+                            controller: stockController, 
+                            readOnly: true, // ป้องกันการแก้สต็อกตรงๆ
+                            decoration: _inputDecoration('จำนวน').copyWith(
+                              fillColor: Colors.grey[200],
+                              helperText: 'แก้ไขได้ผ่านการรับสินค้า/ขายเท่านั้น',
+                              helperStyle: GoogleFonts.prompt(fontSize: 10, color: Colors.orange[800]),
+                            ),
+                          ),
+                        ),
                         const SizedBox(width: 16),
-                        Expanded(child: TextField(controller: priceController, keyboardType: TextInputType.number, decoration: _inputDecoration('ราคา'))),
+                        Expanded(child: TextField(controller: markupController, keyboardType: TextInputType.number, decoration: _inputDecoration('กำไร %'))),
                       ],
                     ),
+                    const SizedBox(height: 16),
+                    TextField(controller: priceController, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: _inputDecoration('ราคาขาย')),
                     const SizedBox(height: 16),
                     DropdownButtonFormField<ProductCategory>(
                       value: selectedCategory,
@@ -153,10 +166,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
                             name: nameController.text.trim(),
                             stock: int.tryParse(stockController.text.trim()) ?? 0,
                             price: double.tryParse(priceController.text.trim()) ?? 0.0,
+                            markupPercentage: double.tryParse(markupController.text.trim()) ?? 0.0,
                             unit: selectedUnit,
                             category: selectedCategory,
                             warehouse: selectedWarehouse,
-                            imagePath: provider.productImage?.path,
+                            imagePath: provider.productImage?.path ?? product.imagePath,
                           ));
 
                           // แสดงแจ้งเตือนสำเร็จ

@@ -70,8 +70,8 @@ class SalesDashboardTab extends StatelessWidget {
 
     // คำนวณยอดค้างชำระลูกหนี้ (เงินเข้า) จากยอดคงเหลือจริง
     final totalUnpaid = cartProvider.debtRecords
-        .where((d) => d['DeptStatus'] == 'Pending' && d['DeptRecordStatus'] == 'Confirmed')
-        .fold(0.0, (sum, d) => sum + (d['RemainingAmount'] as num).toDouble());
+        .where((d) => d['debtstatus'] == 'Pending' && d['debtrecordstatus'] == 'Confirmed')
+        .fold(0.0, (sum, d) => sum + (d['remainingamount'] as num).toDouble());
 
     final totalOrders = orders.length;
 
@@ -164,21 +164,21 @@ class PurchasesDashboardTab extends StatelessWidget {
     final history = poProvider.purchaseHistory;
     final now = DateTime.now();
 
-    final confirmedPOs = history.where((po) => po['Status'] == 'Confirmed').toList();
+    final confirmedPOs = history.where((po) => po['status'] == 'Confirmed').toList();
 
     final todayInvestment = confirmedPOs.where((po) {
-      final date = DateTime.parse(po['ReceiveDate']);
+      final date = DateTime.parse(po['receivedate']);
       return date.day == now.day && date.month == now.month && date.year == now.year;
-    }).fold(0.0, (sum, po) => sum + (po['TotalCost'] as num).toDouble());
+    }).fold(0.0, (sum, po) => sum + (po['totalcost'] as num).toDouble());
 
     final monthInvestment = confirmedPOs.where((po) {
-      final date = DateTime.parse(po['ReceiveDate']);
+      final date = DateTime.parse(po['receivedate']);
       return date.month == now.month && date.year == now.year;
-    }).fold(0.0, (sum, po) => sum + (po['TotalCost'] as num).toDouble());
+    }).fold(0.0, (sum, po) => sum + (po['totalcost'] as num).toDouble());
 
-    // คำนวณยอดค้างชำระเจ้าหนี้ (เงินออก) จากยอดคงเหลือจริง (TotalCost - PaidAmount)
-    final totalPending = confirmedPOs.where((po) => po['PaymentStatus'] == 'Pending')
-        .fold(0.0, (sum, po) => sum + ((po['TotalCost'] as num) - (po['PaidAmount'] as num)).toDouble());
+    // คำนวณยอดค้างชำระเจ้าหนี้ (เงินออก) จากยอดคงเหลือจริง (totalcost - paidamount)
+    final totalPending = confirmedPOs.where((po) => po['paymentstatus'] == 'Pending')
+        .fold(0.0, (sum, po) => sum + ((po['totalcost'] as num) - (po['paidamount'] as num)).toDouble());
 
     final totalBills = confirmedPOs.length;
 
@@ -188,9 +188,9 @@ class PurchasesDashboardTab extends StatelessWidget {
       final date = now.subtract(Duration(days: i));
       days.add(DateFormat('E').format(date));
       final dailyTotal = confirmedPOs.where((po) {
-        final d = DateTime.parse(po['ReceiveDate']);
+        final d = DateTime.parse(po['receivedate']);
         return d.day == date.day && d.month == date.month && d.year == date.year;
-      }).fold(0.0, (sum, po) => sum + (po['TotalCost'] as num).toDouble());
+      }).fold(0.0, (sum, po) => sum + (po['totalcost'] as num).toDouble());
 
       barGroups.add(
         BarChartGroupData(

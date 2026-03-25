@@ -9,15 +9,15 @@ class Warehouse {
 
   Map<String, dynamic> toMap() {
     return {
-      'WarehouseID': id,
-      'WarehouseName': name,
+      'warehouseid': id,
+      'warehousename': name,
     };
   }
 
   factory Warehouse.fromMap(Map<String, dynamic> map) {
     return Warehouse(
-      id: map['WarehouseID']?.toString() ?? '',
-      name: map['WarehouseName'] ?? '',
+      id: (map['warehouseid'] ?? map['WarehouseID'])?.toString() ?? '',
+      name: map['warehousename'] ?? map['WarehouseName'] ?? '',
     );
   }
 }

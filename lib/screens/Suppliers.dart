@@ -15,7 +15,10 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<PurchaseOrderProvider>(context, listen: false).loadSuppliers();
+      Provider.of<PurchaseOrderProvider>(
+        context,
+        listen: false,
+      ).loadSuppliers();
     });
   }
 
@@ -61,22 +64,32 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                     ],
                   ),
                   child: ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 8,
+                    ),
                     leading: CircleAvatar(
                       backgroundColor: Colors.blue[50],
                       child: const Icon(Icons.business, color: Colors.blue),
                     ),
                     title: Text(
-                      supplier['SupplierName'] ?? 'ไม่ระบุชื่อ',
-                      style: GoogleFonts.prompt(fontWeight: FontWeight.bold, fontSize: 16),
+                      supplier['supplier_name'] ?? 'ไม่ระบุชื่อ',
+                      style: GoogleFonts.prompt(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
                     ),
                     subtitle: Text(
-                      'เบอร์โทร: ${supplier['Phone'] ?? '-'}',
+                      'เบอร์โทร: ${supplier['phone'] ?? '-'}',
                       style: GoogleFonts.prompt(color: Colors.grey[600]),
                     ),
                     trailing: IconButton(
                       icon: const Icon(Icons.edit_outlined, color: Colors.grey),
-                      onPressed: () => _showEditSupplierDialog(context, poProvider, supplier),
+                      onPressed: () => _showEditSupplierDialog(
+                        context,
+                        poProvider,
+                        supplier,
+                      ),
                     ),
                   ),
                 );
@@ -86,12 +99,18 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
         onPressed: () => _showAddSupplierDialog(context, poProvider),
         backgroundColor: const Color(0xFF1E2736),
         icon: const Icon(Icons.add, color: Colors.white),
-        label: Text('เพิ่มผู้จัดจำหน่าย', style: GoogleFonts.prompt(color: Colors.white)),
+        label: Text(
+          'เพิ่มผู้จัดจำหน่าย',
+          style: GoogleFonts.prompt(color: Colors.white),
+        ),
       ),
     );
   }
 
-  void _showAddSupplierDialog(BuildContext context, PurchaseOrderProvider provider) {
+  void _showAddSupplierDialog(
+    BuildContext context,
+    PurchaseOrderProvider provider,
+  ) {
     final nameController = TextEditingController();
     final phoneController = TextEditingController();
 
@@ -99,7 +118,10 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text('เพิ่มผู้จัดจำหน่าย', style: GoogleFonts.prompt(fontWeight: FontWeight.bold)),
+        title: Text(
+          'เพิ่มผู้จัดจำหน่าย',
+          style: GoogleFonts.prompt(fontWeight: FontWeight.bold),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -131,31 +153,48 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
           ElevatedButton(
             onPressed: () async {
               if (nameController.text.isNotEmpty) {
-                await provider.addSupplier(nameController.text, phoneController.text);
+                await provider.addSupplier(
+                  nameController.text,
+                  phoneController.text,
+                );
                 if (mounted) Navigator.pop(ctx);
               }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF1E2736),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
-            child: Text('บันทึก', style: GoogleFonts.prompt(color: Colors.white)),
+            child: Text(
+              'บันทึก',
+              style: GoogleFonts.prompt(color: Colors.white),
+            ),
           ),
         ],
       ),
     );
   }
 
-  void _showEditSupplierDialog(BuildContext context, PurchaseOrderProvider provider, Map<String, dynamic> supplier) {
-    final nameController = TextEditingController(text: supplier['SupplierName']);
-    final phoneController = TextEditingController(text: supplier['Phone']);
-    final String supplierId = supplier['SupplierID'].toString();
+  void _showEditSupplierDialog(
+    BuildContext context,
+    PurchaseOrderProvider provider,
+    Map<String, dynamic> supplier,
+  ) {
+    final nameController = TextEditingController(
+      text: supplier['supplier_name'],
+    );
+    final phoneController = TextEditingController(text: supplier['phone']);
+    final String supplierId = supplier['supplier_id'].toString();
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text('แก้ไขผู้จัดจำหน่าย', style: GoogleFonts.prompt(fontWeight: FontWeight.bold)),
+        title: Text(
+          'แก้ไขผู้จัดจำหน่าย',
+          style: GoogleFonts.prompt(fontWeight: FontWeight.bold),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -197,9 +236,14 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF1E2736),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
-            child: Text('บันทึก', style: GoogleFonts.prompt(color: Colors.white)),
+            child: Text(
+              'บันทึก',
+              style: GoogleFonts.prompt(color: Colors.white),
+            ),
           ),
         ],
       ),

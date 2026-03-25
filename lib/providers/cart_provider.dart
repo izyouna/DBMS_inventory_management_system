@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../models/product.dart';
 import '../models/cart_item.dart';
@@ -56,19 +57,30 @@ class CartProvider with ChangeNotifier {
     try {
       final details = await DatabaseService.instance.getOrderDetails(orderId);
       return details.map((d) {
+        final productData = d['product'];
+        String unitLabel = 'ไม่ระบุหน่วย';
+        
+        if (productData != null && productData['productunit'] != null) {
+          unitLabel = productData['productunit']['unitname'] ?? 'ไม่ระบุหน่วย';
+        }
+
         return CartItem(
           product: Product(
-            id: d['ProductID'] ?? '',
-            name: d['ProductName'] ?? 'ไม่พบชื่อสินค้า',
-            price: (d['UnitPrice'] ?? 0).toDouble(),
+            id: (productData != null ? productData['productid'] : (d['productid'] ?? '')).toString(),
+            name: productData != null ? (productData['productname'] ?? 'ไม่พบชื่อสินค้า') : (d['productname'] ?? 'ไม่พบชื่อสินค้า'),
+            price: (d['unit_price'] ?? 0).toDouble(),
             stock: 0, 
-            unit: ProductUnit(id: '', label: d['Unit'] ?? ''),
+            unit: ProductUnit(
+              id: (productData != null ? productData['unitid'] : '').toString(), 
+              label: unitLabel
+            ),
             category: ProductCategory(id: '', label: ''),
           ),
-          quantity: d['Quantity'] ?? 0,
+          quantity: (d['quantity'] ?? 0).toInt(),
         );
       }).toList();
     } catch (e) {
+
       debugPrint("Error fetching order details: $e");
       return [];
     }
@@ -89,25 +101,32 @@ class CartProvider with ChangeNotifier {
   }
 
   // ฟังก์ชัน Checkout (ส่ง paymentStatus)
-  Future<Order> checkout(PaymentMethod method, {Customer? customer}) async {
+  Future<Order> checkout(PaymentMethod method, {Customer? customer, String? dueDate}) async {
     final now = DateTime.now();
     final paymentType = method.name; 
     
     final List<Map<String, dynamic>> dbItems = _items.values.map((item) => {
-      'ProductID': item.product.id,
-      'UnitPrice': item.product.price,
-      'Quantity': item.quantity,
+      'productid': item.product.id,
+      'unit_price': item.product.price,
+      'quantity': item.quantity,
     }).toList();
+
+    String? paymentId;
+    if (method is CashPayment) paymentId = 'PAY1';
+    else if (method is QRPayment) paymentId = 'PAY2';
+    else if (method is CreditPayment) paymentId = 'PAY3';
 
     // 1. บันทึกลง Database
     final orderId = await DatabaseService.instance.saveOrder(
       date: now.toIso8601String(),
       totalAmount: totalAmount,
       paymentStatus: method is CreditPayment ? 'ค้างชำระ' : 'ชำระแล้ว',
-      paymentType: paymentType,
+      paymentId: paymentId,
       items: dbItems,
       customerName: customer?.name,
       phone: customer?.phone,
+      dueDate: dueDate,
+      creditLimit: customer?.creditLimit, // ส่งวงเงินเครดิตไปด้วย
     );
 
     // 2. สร้าง Order object สำหรับส่งกลับ (เพื่อให้มีรายการสินค้าครบถ้วนสำหรับปริ้น)
@@ -120,13 +139,16 @@ class CartProvider with ChangeNotifier {
       documentType: method is CreditPayment ? DocumentType.invoice : DocumentType.receipt,
       isPaid: method is! CreditPayment,
       customer: customer,
+      dueDate: dueDate != null ? DateTime.parse(dueDate) : null,
     );
 
-    // 3. รีโหลดประวัติบิลและลูกหนี้จาก Database
-    await loadOrdersFromDatabase();
-    await loadDebtRecords();
+    // ล้างตะกร้าทันทีหลังบันทึกสำเร็จ
+    _items.clear();
     
-    clearCart();
+    // รีโหลดประวัติบิลและลูกหนี้แบบเบื้องหลัง (ไม่ต้องรอให้เสร็จก่อน return)
+    loadOrdersFromDatabase().catchError((e) => debugPrint("Error reloading orders: $e"));
+    loadDebtRecords().catchError((e) => debugPrint("Error reloading debt: $e"));
+    
     notifyListeners();
     return completedOrder;
   }
@@ -164,12 +186,17 @@ class CartProvider with ChangeNotifier {
   Future<bool> addDebtPayment({
     required String debtId,
     required double amount,
-    String? imagePath,
+    dynamic image,
   }) async {
+    String? uploadedPath;
+    if (image != null) {
+      uploadedPath = await DatabaseService.instance.uploadBillImage(image);
+    }
+
     final success = await DatabaseService.instance.addDebtPayment(
       debtId: debtId,
       amount: amount,
-      imagePath: imagePath,
+      imagePath: uploadedPath,
     );
     if (success) {
       await loadDebtRecords();

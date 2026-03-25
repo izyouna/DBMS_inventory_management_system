@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'PurchaseOrder.dart';
 import 'PurchaseHistory.dart';
 import 'Suppliers.dart';
+import 'CustomerCredit.dart'; // นำเข้าหน้าจอใหม่
 
 class SettingScreen extends StatelessWidget {
   const SettingScreen({super.key});
@@ -10,14 +11,10 @@ class SettingScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = [
-      // {'icon': Icons.storefront, 'title': 'ข้อมูลร้านค้า'},
-      // {'icon': Icons.receipt_long, 'title': 'รูปแบบใบเสร็จ'},
-      {'icon': Icons.inventory_2, 'title': 'ใบสั่งซื้อ'},
-      {'icon': Icons.history, 'title': 'ประวัติใบสั่งซื้อ'},
+      {'icon': Icons.inventory_2, 'title': 'รับสินค้า'},
+      {'icon': Icons.history, 'title': 'ประวัติการรับสินค้า'},
       {'icon': Icons.business, 'title': 'ผู้จัดจำหน่าย'},
-      // {'icon': Icons.payments_outlined, 'title': 'ช่องทางการชำระเงิน'},
-      // {'icon': Icons.account_circle_outlined, 'title': 'ผู้ใช้งานระบบ'},
-      // {'icon': Icons.lock_outline, 'title': 'ความปลอดภัย'},
+      {'icon': Icons.group_outlined, 'title': 'จัดการวงเงินลูกค้า'}, // เมนูใหม่
     ];
 
     return Scaffold(
@@ -64,14 +61,14 @@ class SettingScreen extends StatelessWidget {
               ),
               trailing: const Icon(Icons.chevron_right),
               onTap: () {
-                if (item['title'] == 'ใบสั่งซื้อ') {
+                if (item['title'] == 'รับสินค้า') {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (context) => const PurchaseOrderScreen(),
                     ),
                   );
-                } else if (item['title'] == 'ประวัติใบสั่งซื้อ') {
+                } else if (item['title'] == 'ประวัติการรับสินค้า') {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -83,6 +80,13 @@ class SettingScreen extends StatelessWidget {
                     context,
                     MaterialPageRoute(
                       builder: (context) => const SuppliersScreen(),
+                    ),
+                  );
+                } else if (item['title'] == 'จัดการวงเงินลูกค้า') {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const CustomerCreditScreen(),
                     ),
                   );
                 }

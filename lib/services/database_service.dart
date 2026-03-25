@@ -1,405 +1,101 @@
+import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'package:path/path.dart';
-import 'package:sqflite/sqflite.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class DatabaseService {
-  static Database? _db;
   static final DatabaseService instance = DatabaseService._constructor();
-
-  // ระบบสำรองสำหรับ Web (Memory Storage)
-  final List<Map<String, dynamic>> _webMemoryDb = [];
-  final List<Map<String, dynamic>> _webWarehouseMemoryDb = [
-    {'WarehouseID': 'W1', 'WarehouseName': 'หน้าร้าน'},
-    {'WarehouseID': 'W2', 'WarehouseName': 'โรงรถ'},
-    {'WarehouseID': 'W3', 'WarehouseName': 'คลังสินค้าหลังร้าน'},
-  ];
-  final List<Map<String, dynamic>> _webSupplierMemoryDb = [];
-  final List<Map<String, dynamic>> _webPaymentTypeDb = [
-    {'PaymentID': 'PAY1', 'TypeName': 'เงินสด'},
-    {'PaymentID': 'PAY2', 'TypeName': 'QR Code / โอนเงิน'},
-    {'PaymentID': 'PAY3', 'TypeName': 'ขายเชื่อ (ค้างชำระ)'},
-  ];
-  final List<Map<String, dynamic>> _webSaleOrderDb = [];
-  final List<Map<String, dynamic>> _webOrderDetailDb = [];
-  int _webIdCounter = 1;
-
-  // Table Names
-  final String _productTableName = "Product";
-  final String _warehouseTableName = "Warehouse";
-  final String _saleOrderTableName = "SaleOrder";
-  final String _orderDetailTableName = "OrderDetail";
-  final String _paymentTypeTableName = "PaymentType";
-  final String _purchaseOrderTableName = "PurchaseOrder";
-  final String _purchaseDetailTableName = "PurchaseDetail";
-  final String _purchaseTypeTableName = "PurchaseType";
-  final String _creditPaymentHistoryTableName = "CreditPaymentHistory";
-  final String _debtRecordTableName = "DebtRecord";
-  final String _debtPaymentHistoryTableName =
-      "DeptPaymentHistory"; // ตารางประวัติการชำระหนี้ (ลูกหนี้)
-  final String _supplierTableName = "Supplier";
-
-  // Product Columns
-  final String _productIdColumnName = "ProductID";
-  final String _productNameColumnName = "ProductName";
-  final String _productCategoryColumnName = "Category";
-  final String _productTotalUnitColumnName = "TotalUnit";
-  final String _productPriceColumnName = "Price";
-  final String _productUnitColumnName = "Unit";
-  final String _productImagePathColumnName = "ImagePath";
-  final String _productWarehouseIdColumnName = "WarehouseID";
-  final String _productIsActiveColumnName = "IsActive";
-
-  // Supplier Columns
-  final String _supplierIdColumnName = "SupplierID";
-  final String _supplierNameColumnName = "SupplierName";
-  final String _supplierPhoneColumnName = "Phone";
-
-  // Warehouse Columns
-  final String _warehouseIdColumnName = "WarehouseID";
-  final String _warehouseNameColumnName = "WarehouseName";
-
-  // SaleOrder Columns
-  final String _orderIdColumnName = "OrderID";
-  final String _orderDateColumnName = "OrderDate";
-  final String _orderTotalAmountColumnName = "TotalAmount";
-  final String _orderPaymentStatusColumnName = "PaymentStatus";
-  final String _orderStatusColumnName = "OrderStatus";
-  final String _orderPaymentIdColumnName = "PaymentID";
-
-  // OrderDetail / PurchaseDetail Columns
-  final String _detailUnitPriceColumnName = "UnitPrice";
-  final String _detailQuantityColumnName = "Quantity";
-
-  // PaymentType Columns
-  final String _paymentIdColumnName = "PaymentID";
-  final String _paymentTypeNameColumnName = "TypeName";
-
-  // PurchaseOrder Columns
-  final String _poIdColumnName = "POID";
-  final String _poReceiveDateColumnName = "ReceiveDate";
-  final String _poTotalCostColumnName = "TotalCost";
-  final String _poPaidAmountColumnName = "PaidAmount";
-  final String _poBillImagePathColumnName = "BillImagePath";
-  final String _poStatusColumnName = "Status";
-  final String _poPaymentStatusColumnName = "PaymentStatus";
-  final String _poTypeIdColumnName = "PTID";
-  final String _poSupplierIdColumnName = "SupplierID";
-
-  // PurchaseType Columns
-  final String _ptIdColumnName = "PTID";
-  final String _ptNameColumnName = "PTName";
-
-  // CreditPaymentHistory Columns (เจ้าหนี้)
-  final String _cphIdColumnName = "PaymentID";
-  final String _cphAmountPaidColumnName = "AmountPaid";
-  final String _cphPaidDateColumnName = "PaidDate";
-  final String _cphPaidImagePathColumnName = "PaidImagePath";
-
-  // DebtRecord Columns
-  final String _debtIdColumnName = "DebtID";
-  final String _debtStatusColumnName = "DeptStatus";
-  final String _debtRecordStatusColumnName = "DeptRecordStatus";
-  final String _debtOriginalAmountColumnName = "OriginalAmount";
-  final String _debtRemainingAmountColumnName = "RemainingAmount";
-  final String _debtStartDateColumnName = "StartDate";
-  final String _debtCustomerNameColumnName = "CustomerName";
-  final String _debtPhoneColumnName = "Phone";
-
-  // DeptPaymentHistory Columns (ลูกหนี้ - เพิ่มใหม่)
-  final String _dphIdColumnName = "DeptPaymentID";
-  final String _dphAmountPaidColumnName = "AmountPaid";
-  final String _dphPaidDateColumnName = "PaidDate";
-  final String _dphPaidImagePathColumnName = "DeptPaidImagePath";
+  final SupabaseClient _supabase = Supabase.instance.client;
 
   DatabaseService._constructor();
 
-  Future<Database?> get database async {
-    if (kIsWeb) return null;
-    if (_db != null) return _db!;
-    try {
-      _db = await getDatabase();
-      return _db;
-    } catch (e) {
-      debugPrint("Database initialization failed: $e");
-      return null;
-    }
-  }
-
-  Future<Database> getDatabase() async {
-    String databasePath;
-    final databaseDirPath = await getDatabasesPath();
-    databasePath = join(databaseDirPath, "master_db.db");
-
-    return await databaseFactory.openDatabase(
-      databasePath,
-      options: OpenDatabaseOptions(
-        version: 19, // อัปเกรดเป็น 19 เพิ่ม IsActive ใน Product
-        onCreate: (db, version) async {
-          await _createTables(db);
-          await _seedInitialData(db);
-        },
-        onUpgrade: (db, oldVersion, newVersion) async {
-          if (oldVersion < 18) {
-            // ล้างไพ่ถ้าเวอร์ชันต่ำกว่า 18 (ช่วงพัฒนา)
-            await db.execute("DROP TABLE IF EXISTS $_debtPaymentHistoryTableName");
-            await db.execute("DROP TABLE IF EXISTS $_debtRecordTableName");
-            await db.execute("DROP TABLE IF EXISTS $_creditPaymentHistoryTableName");
-            await db.execute("DROP TABLE IF EXISTS $_purchaseDetailTableName");
-            await db.execute("DROP TABLE IF EXISTS $_purchaseOrderTableName");
-            await db.execute("DROP TABLE IF EXISTS $_purchaseTypeTableName");
-            await db.execute("DROP TABLE IF EXISTS $_orderDetailTableName");
-            await db.execute("DROP TABLE IF EXISTS $_paymentTypeTableName");
-            await db.execute("DROP TABLE IF EXISTS $_saleOrderTableName");
-            await db.execute("DROP TABLE IF EXISTS $_productTableName");
-            await db.execute("DROP TABLE IF EXISTS $_warehouseTableName");
-            await db.execute("DROP TABLE IF EXISTS $_supplierTableName");
-            await _createTables(db);
-            await _seedInitialData(db);
-          } else {
-            // อัปเกรดแบบรักษาข้อมูล
-            if (oldVersion == 18) {
-              // เพิ่ม IsActive ใน Product สำหรับเวอร์ชัน 19
-              await db.execute("ALTER TABLE $_productTableName ADD COLUMN $_productIsActiveColumnName INTEGER DEFAULT 1");
-            }
-          }
-
-          // ตรวจสอบความปลอดภัย: ตรวจว่าตาราง Supplier มีอยู่จริงหรือไม่ (กรณีหลุดจาก migration ก่อนหน้า)
-          await db.execute('''
-            CREATE TABLE IF NOT EXISTS $_supplierTableName(
-              $_supplierIdColumnName TEXT PRIMARY KEY,
-              $_supplierNameColumnName TEXT NOT NULL,
-              $_supplierPhoneColumnName TEXT
-            )
-          ''');
-        },
-      ),
-    );
-  }
-
-  Future<void> _createTables(Database db) async {
-    await db.execute('''
-      CREATE TABLE $_warehouseTableName(
-        $_warehouseIdColumnName TEXT PRIMARY KEY,
-        $_warehouseNameColumnName TEXT NOT NULL
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE $_supplierTableName(
-        $_supplierIdColumnName TEXT PRIMARY KEY,
-        $_supplierNameColumnName TEXT NOT NULL,
-        $_supplierPhoneColumnName TEXT
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE $_paymentTypeTableName(
-        $_paymentIdColumnName TEXT PRIMARY KEY,
-        $_paymentTypeNameColumnName TEXT NOT NULL
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE $_purchaseTypeTableName(
-        $_ptIdColumnName TEXT PRIMARY KEY,
-        $_ptNameColumnName TEXT NOT NULL
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE $_productTableName(
-        $_productIdColumnName TEXT PRIMARY KEY,
-        $_productNameColumnName TEXT NOT NULL,
-        $_productCategoryColumnName TEXT,
-        $_productTotalUnitColumnName INTEGER,
-        $_productPriceColumnName REAL,
-        $_productUnitColumnName TEXT,
-        $_productImagePathColumnName TEXT,
-        $_productWarehouseIdColumnName TEXT,
-        $_productIsActiveColumnName INTEGER DEFAULT 1,
-        FOREIGN KEY ($_productWarehouseIdColumnName) REFERENCES $_warehouseTableName($_warehouseIdColumnName)
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE $_saleOrderTableName(
-        $_orderIdColumnName TEXT PRIMARY KEY,
-        $_orderDateColumnName TEXT NOT NULL,
-        $_orderTotalAmountColumnName REAL NOT NULL,
-        $_orderPaymentStatusColumnName TEXT NOT NULL,
-        $_orderStatusColumnName TEXT NOT NULL,
-        $_orderPaymentIdColumnName TEXT,
-        FOREIGN KEY ($_orderPaymentIdColumnName) REFERENCES $_paymentTypeTableName($_paymentIdColumnName)
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE $_orderDetailTableName(
-        $_orderIdColumnName TEXT,
-        $_productIdColumnName TEXT,
-        $_detailUnitPriceColumnName REAL NOT NULL,
-        $_detailQuantityColumnName INTEGER NOT NULL,
-        PRIMARY KEY ($_orderIdColumnName, $_productIdColumnName),
-        FOREIGN KEY ($_orderIdColumnName) REFERENCES $_saleOrderTableName($_orderIdColumnName),
-        FOREIGN KEY ($_productIdColumnName) REFERENCES $_productTableName($_productIdColumnName)
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE $_purchaseOrderTableName(
-        $_poIdColumnName TEXT PRIMARY KEY,
-        $_poReceiveDateColumnName TEXT NOT NULL,
-        $_poTotalCostColumnName REAL NOT NULL,
-        $_poPaidAmountColumnName REAL NOT NULL DEFAULT 0,
-        $_poBillImagePathColumnName TEXT,
-        $_poStatusColumnName TEXT NOT NULL,
-        $_poPaymentStatusColumnName TEXT NOT NULL,
-        $_poTypeIdColumnName TEXT,
-        $_poSupplierIdColumnName TEXT,
-        FOREIGN KEY ($_poTypeIdColumnName) REFERENCES $_purchaseTypeTableName($_ptIdColumnName),
-        FOREIGN KEY ($_poSupplierIdColumnName) REFERENCES $_supplierTableName($_supplierIdColumnName)
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE $_purchaseDetailTableName(
-        $_poIdColumnName TEXT,
-        $_productIdColumnName TEXT,
-        $_detailUnitPriceColumnName REAL NOT NULL,
-        $_detailQuantityColumnName INTEGER NOT NULL,
-        PRIMARY KEY ($_poIdColumnName, $_productIdColumnName),
-        FOREIGN KEY ($_poIdColumnName) REFERENCES $_purchaseOrderTableName($_poIdColumnName),
-        FOREIGN KEY ($_productIdColumnName) REFERENCES $_productTableName($_productIdColumnName)
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE $_creditPaymentHistoryTableName(
-        $_cphIdColumnName INTEGER PRIMARY KEY AUTOINCREMENT,
-        $_poIdColumnName TEXT NOT NULL,
-        $_cphAmountPaidColumnName REAL NOT NULL,
-        $_cphPaidDateColumnName TEXT NOT NULL,
-        $_cphPaidImagePathColumnName TEXT,
-        FOREIGN KEY ($_poIdColumnName) REFERENCES $_purchaseOrderTableName($_poIdColumnName)
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE $_debtRecordTableName(
-        $_debtIdColumnName TEXT PRIMARY KEY,
-        $_orderIdColumnName TEXT NOT NULL,
-        $_debtStatusColumnName TEXT NOT NULL,
-        $_debtRecordStatusColumnName TEXT NOT NULL,
-        $_debtOriginalAmountColumnName REAL NOT NULL,
-        $_debtRemainingAmountColumnName REAL NOT NULL,
-        $_debtStartDateColumnName TEXT NOT NULL,
-        $_debtCustomerNameColumnName TEXT,
-        $_debtPhoneColumnName TEXT,
-        FOREIGN KEY ($_orderIdColumnName) REFERENCES $_saleOrderTableName($_orderIdColumnName)
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE $_debtPaymentHistoryTableName(
-        $_dphIdColumnName INTEGER PRIMARY KEY AUTOINCREMENT,
-        $_debtIdColumnName TEXT NOT NULL,
-        $_dphAmountPaidColumnName REAL NOT NULL,
-        $_dphPaidDateColumnName TEXT NOT NULL,
-        $_dphPaidImagePathColumnName TEXT,
-        FOREIGN KEY ($_debtIdColumnName) REFERENCES $_debtRecordTableName($_debtIdColumnName)
-      )
-    ''');
-  }
-
-  Future<void> _seedInitialData(Database db) async {
-    await db.insert(_warehouseTableName, {
-      _warehouseIdColumnName: 'W1',
-      _warehouseNameColumnName: 'หน้าร้าน',
-    });
-    await db.insert(_warehouseTableName, {
-      _warehouseIdColumnName: 'W2',
-      _warehouseNameColumnName: 'โรงรถ',
-    });
-    await db.insert(_warehouseTableName, {
-      _warehouseIdColumnName: 'W3',
-      _warehouseNameColumnName: 'คลังสินค้าหลังร้าน',
-    });
-
-    await db.insert(_paymentTypeTableName, {
-      _paymentIdColumnName: 'PAY1',
-      _paymentTypeNameColumnName: 'เงินสด',
-    });
-    await db.insert(_paymentTypeTableName, {
-      _paymentIdColumnName: 'PAY2',
-      _paymentTypeNameColumnName: 'QR Code / โอนเงิน',
-    });
-    await db.insert(_paymentTypeTableName, {
-      _paymentIdColumnName: 'PAY3',
-      _paymentTypeNameColumnName: 'ขายเชื่อ (ค้างชำระ)',
-    });
-
-    await db.insert(_purchaseTypeTableName, {
-      _ptIdColumnName: 'PT1',
-      _ptNameColumnName: 'เงินสด',
-    });
-    await db.insert(_purchaseTypeTableName, {
-      _ptIdColumnName: 'PT2',
-      _ptNameColumnName: 'ค้างชำระ (เครดิต)',
-    });
-  }
-
+  // --- Helper Methods ---
   Future<String> _generateCustomId(
     String tableName,
     String idColumn,
     String prefix,
   ) async {
-    final db = await database;
-    if (db == null) return "${prefix}1";
-    
-    // ค้นหา ID สูงสุดที่มีอยู่
-    final result = await db.rawQuery('SELECT $idColumn FROM $tableName');
-    if (result.isEmpty) return "${prefix}1";
+    final String col = idColumn.toLowerCase();
+    final response = await _supabase
+        .from(tableName)
+        .select(col)
+        .order(col, ascending: false)
+        .limit(1)
+        .maybeSingle();
 
-    int maxId = 0;
-    for (var row in result) {
-      String idStr = row[idColumn].toString();
-      if (idStr.startsWith(prefix)) {
-        int? currentId = int.tryParse(idStr.substring(prefix.length));
-        if (currentId != null && currentId > maxId) {
-          maxId = currentId;
-        }
+    if (response == null) return "${prefix}1";
+
+    String lastId = response[col].toString();
+    if (lastId.startsWith(prefix)) {
+      int? currentId = int.tryParse(lastId.substring(prefix.length));
+      if (currentId != null) {
+        return "$prefix${currentId + 1}";
       }
     }
-    
-    return "$prefix${maxId + 1}";
+    return "${prefix}1";
+  }
+
+  // --- Storage Methods ---
+  Future<String?> uploadProductImage(dynamic file) async {
+    try {
+      final String fileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final String path = 'public/$fileName';
+
+      final Uint8List bytes = await _getFileBytes(file);
+      await _supabase.storage.from('products').uploadBinary(path, bytes);
+
+      final String publicUrl = _supabase.storage
+          .from('products')
+          .getPublicUrl(path);
+      return publicUrl;
+    } catch (e) {
+      debugPrint('Error uploading product image: $e');
+      return null;
+    }
+  }
+
+  Future<String?> uploadBillImage(dynamic file) async {
+    try {
+      final String fileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final String path = 'public/$fileName';
+
+      final Uint8List bytes = await _getFileBytes(file);
+      await _supabase.storage.from('bills').uploadBinary(path, bytes);
+
+      return path;
+    } catch (e) {
+      debugPrint('Error uploading bill image: $e');
+      return null;
+    }
+  }
+
+  Future<Uint8List> _getFileBytes(dynamic file) async {
+    if (file is Uint8List) return file;
+    if (file is File) return await file.readAsBytes();
+    return await file.readAsBytes();
+  }
+
+  Future<String?> getSignedUrl(String path) async {
+    if (path.isEmpty) return null;
+    try {
+      return await _supabase.storage.from('bills').createSignedUrl(path, 600);
+    } catch (e) {
+      debugPrint('Error getting signed URL: $e');
+      return null;
+    }
   }
 
   // --- Warehouse Methods ---
   Future<String> addWarehouse(String name) async {
-    if (kIsWeb) {
-      final newId = "W${_webWarehouseMemoryDb.length + 1}";
-      _webWarehouseMemoryDb.add({'WarehouseID': newId, 'WarehouseName': name});
-      return newId;
-    }
-    final db = await database;
-    if (db == null) return "";
-    final newId = await _generateCustomId(
-      _warehouseTableName,
-      _warehouseIdColumnName,
-      "W",
-    );
-    await db.insert(_warehouseTableName, {
-      _warehouseIdColumnName: newId,
-      _warehouseNameColumnName: name,
+    final newId = await _generateCustomId('warehouse', 'warehouseid', 'W');
+    await _supabase.from('warehouse').insert({
+      'warehouseid': newId,
+      'warehousename': name,
     });
     return newId;
   }
 
   Future<List<Map<String, dynamic>>> getWarehouses() async {
-    if (kIsWeb) return List<Map<String, dynamic>>.from(_webWarehouseMemoryDb);
-    final db = await database;
-    if (db == null) return [];
-    return await db.query(_warehouseTableName);
+    return await _supabase.from('warehouse').select();
   }
 
   // --- Supplier Methods ---
@@ -407,420 +103,572 @@ class DatabaseService {
     required String name,
     required String phone,
   }) async {
-    if (kIsWeb) {
-      final newId = "S${_webSupplierMemoryDb.length + 1}";
-      _webSupplierMemoryDb.add({
-        _supplierIdColumnName: newId,
-        _supplierNameColumnName: name,
-        _supplierPhoneColumnName: phone,
-      });
-      return newId;
-    }
-    final db = await database;
-    if (db == null) return "";
-    final newId = await _generateCustomId(
-      _supplierTableName,
-      _supplierIdColumnName,
-      "S",
-    );
-    await db.insert(_supplierTableName, {
-      _supplierIdColumnName: newId,
-      _supplierNameColumnName: name,
-      _supplierPhoneColumnName: phone,
+    final newId = await _generateCustomId('supplier', 'supplier_id', 'S');
+    await _supabase.from('supplier').insert({
+      'supplier_id': newId,
+      'supplier_name': name,
+      'phone': phone,
     });
     return newId;
   }
 
   Future<List<Map<String, dynamic>>> getSuppliers() async {
-    if (kIsWeb) return List<Map<String, dynamic>>.from(_webSupplierMemoryDb);
-    final db = await database;
-    if (db == null) return [];
-    return await db.query(_supplierTableName);
+    return await _supabase.from('supplier').select();
   }
 
-  Future<int> deleteSupplier(String id) async {
-    if (kIsWeb) {
-      final count = _webSupplierMemoryDb.length;
-      _webSupplierMemoryDb.removeWhere((s) => s[_supplierIdColumnName] == id);
-      return count != _webSupplierMemoryDb.length ? 1 : 0;
-    }
-    final db = await database;
-    if (db == null) return 0;
-    return await db.delete(
-      _supplierTableName,
-      where: '$_supplierIdColumnName = ?',
-      whereArgs: [id],
-    );
+  Future<void> deleteSupplier(String id) async {
+    await _supabase.from('supplier').delete().eq('supplier_id', id);
   }
 
-  Future<int> updateSupplier({
+  Future<void> updateSupplier({
     required String id,
     required String name,
     required String phone,
   }) async {
-    if (kIsWeb) {
-      final index = _webSupplierMemoryDb.indexWhere(
-        (s) => s[_supplierIdColumnName] == id,
-      );
-      if (index != -1) {
-        _webSupplierMemoryDb[index][_supplierNameColumnName] = name;
-        _webSupplierMemoryDb[index][_supplierPhoneColumnName] = phone;
-        return 1;
+    await _supabase
+        .from('supplier')
+        .update({'supplier_name': name, 'phone': phone})
+        .eq('supplier_id', id);
+  }
+
+  // --- Customer Methods ---
+  Future<List<Map<String, dynamic>>> getCustomers() async {
+    return await _supabase
+        .from('customer')
+        .select()
+        .order('customername', ascending: true);
+  }
+
+  Future<Map<String, dynamic>?> getCustomerByPhone(String phone) async {
+    try {
+      final cleanPhone = phone.trim();
+      final response = await _supabase
+          .from('customer')
+          .select(
+            '*, debtrecord(remainingamount, debtstatus, debtrecordstatus)',
+          )
+          .eq('customerphone', cleanPhone)
+          .order('customerid', ascending: false)
+          .limit(1);
+
+      if (response == null || (response as List).isEmpty) return null;
+
+      final customer = response[0];
+      double totalDebt = 0;
+      if (customer['debtrecord'] != null) {
+        final List records = customer['debtrecord'] as List;
+        for (var dr in records) {
+          if (dr['debtstatus'] == 'Pending' &&
+              dr['debtrecordstatus'] == 'Confirmed') {
+            totalDebt += (dr['remainingamount'] as num).toDouble();
+          }
+        }
       }
-      return 0;
+
+      final Map<String, dynamic> result = Map<String, dynamic>.from(customer);
+      result['total_debt'] = totalDebt;
+      return result;
+    } catch (e) {
+      debugPrint('Error fetching customer by phone: $e');
+      return null;
     }
-    final db = await database;
-    if (db == null) return 0;
-    return await db.update(
-      _supplierTableName,
-      {_supplierNameColumnName: name, _supplierPhoneColumnName: phone},
-      where: '$_supplierIdColumnName = ?',
-      whereArgs: [id],
-    );
+  }
+
+  Future<void> updateCustomerCreditLimit(int customerId, double limit) async {
+    await _supabase
+        .from('customer')
+        .update({'credit_limit': limit})
+        .eq('customerid', customerId);
+  }
+
+  // --- Category Methods ---
+  Future<String> addCategory(String name) async {
+    final newId = await _generateCustomId('category', 'categoryid', 'C');
+    await _supabase.from('category').insert({
+      'categoryid': newId,
+      'categoryname': name,
+    });
+    return newId;
+  }
+
+  Future<List<Map<String, dynamic>>> getCategories() async {
+    return await _supabase.from('category').select();
+  }
+
+  // --- Product Unit Methods ---
+  Future<List<Map<String, dynamic>>> getProductUnits() async {
+    return await _supabase.from('productunit').select();
   }
 
   // --- Product Methods ---
   Future<String> addProduct({
     required String name,
-    required String category,
+    String? categoryId,
     required int stock,
     required double price,
-    required String unit,
+    double markupPercentage = 0.0,
+    required String unitId,
     String? imagePath,
     String? warehouseId,
   }) async {
-    if (kIsWeb) {
-      final newId = "P${_webIdCounter++}";
-      _webMemoryDb.add({
-        _productIdColumnName: newId,
-        _productNameColumnName: name,
-        _productCategoryColumnName: category,
-        _productTotalUnitColumnName: stock,
-        _productPriceColumnName: price,
-        _productUnitColumnName: unit,
-        _productImagePathColumnName: imagePath,
-        _productWarehouseIdColumnName: warehouseId,
-        _productIsActiveColumnName: 1,
-      });
-      return newId;
+    final newId = await _generateCustomId('product', 'productid', 'P');
+    await _supabase.from('product').insert({
+      'productid': newId,
+      'productname': name,
+      'categoryid': categoryId,
+      'totalunit': stock,
+      'price': price,
+      'markup_percentage': markupPercentage,
+      'unitid': unitId,
+      'productimagepath': imagePath,
+      'warehouseid': warehouseId,
+      'is_active': 1,
+    });
+
+    // หากมีการระบุจำนวนเริ่มต้น ให้สร้างล็อตสินค้าและทรานแซกชันด้วย
+    if (stock > 0) {
+      final poId = 'INIT-${DateTime.now().millisecondsSinceEpoch}';
+
+      // 1. สร้างหัวบิลสั่งซื้อเสมือนสำหรับยอดยกมา
+      try {
+        await _supabase.from('purchaseorder').insert({
+          'poid': poId,
+          'receivedate': DateTime.now().toIso8601String(),
+          'totalcost': 0,
+          'paidamount': 0,
+          'status': 'Confirmed',
+          'paymentstatus': 'Paid',
+        });
+
+        // 2. สร้างล็อตสินค้าเพื่อให้ FIFO ทำงานได้
+        await _supabase.from('purchasedetail').insert({
+          'poid': poId,
+          'productid': newId,
+          'unitprice': 0,
+          'quantity': stock,
+          'quantity_remaining': stock,
+        });
+
+        // 3. บันทึกทรานแซกชัน
+        await _supabase.from('stock_transaction').insert({
+          'transaction_id': 'TX-${DateTime.now().microsecondsSinceEpoch}',
+          'productid': newId,
+          'type': 'IN',
+          'quantity': stock,
+          'balance_after': stock,
+          'reference_id': poId,
+          'created_at': DateTime.now().toIso8601String(),
+          'remarks': 'บันทึกยอดยกมาเริ่มต้น',
+        });
+      } catch (e) {
+        debugPrint('Error creating initial stock records: $e');
+      }
     }
-    final db = await database;
-    if (db == null) return "";
-    final newId = await _generateCustomId(
-      _productTableName,
-      _productIdColumnName,
-      "P",
-    );
-    final data = {
-      _productIdColumnName: newId,
-      _productNameColumnName: name,
-      _productCategoryColumnName: category,
-      _productTotalUnitColumnName: stock,
-      _productPriceColumnName: price,
-      _productUnitColumnName: unit,
-      _productImagePathColumnName: imagePath,
-      _productWarehouseIdColumnName: warehouseId,
-      _productIsActiveColumnName: 1,
-    };
-    await db.insert(_productTableName, data);
+
     return newId;
   }
 
   Future<List<Map<String, dynamic>>> getProducts() async {
-    if (kIsWeb) {
-      return _webMemoryDb
-          .where((p) => (p[_productIsActiveColumnName] ?? 1) == 1)
-          .map((product) {
-            final warehouse = _webWarehouseMemoryDb.firstWhere(
-              (w) =>
-                  w['WarehouseID'].toString() ==
-                  product[_productWarehouseIdColumnName]?.toString(),
-              orElse: () => {},
-            );
-            final result = Map<String, dynamic>.from(product);
-            if (warehouse.isNotEmpty)
-              result['WarehouseName'] = warehouse['WarehouseName'];
-            return result;
-          })
-          .toList();
-    }
-    final db = await database;
-    if (db == null) return [];
-    return await db.rawQuery('''
-      SELECT p.*, w.$_warehouseNameColumnName
-      FROM $_productTableName p
-      LEFT JOIN $_warehouseTableName w ON p.$_productWarehouseIdColumnName = w.$_warehouseIdColumnName
-      WHERE p.$_productIsActiveColumnName = 1
-    ''');
+    return await _supabase
+        .from('product')
+        .select('''
+      *,
+      warehouse (warehousename),
+      category (categoryname),
+      productunit (unitname)
+    ''')
+        .eq('is_active', 1);
   }
 
-  Future<int> deleteProduct(String id) async {
-    if (kIsWeb) {
-      final index = _webMemoryDb.indexWhere(
-        (p) => p[_productIdColumnName] == id,
-      );
-      if (index != -1) {
-        _webMemoryDb[index][_productIsActiveColumnName] = 0;
-        return 1;
-      }
-      return 0;
-    }
-    final db = await database;
-    if (db == null) return 0;
-    return await db.update(
-      _productTableName,
-      {_productIsActiveColumnName: 0},
-      where: '$_productIdColumnName = ?',
-      whereArgs: [id],
-    );
+  Future<void> deleteProduct(String id) async {
+    await _supabase
+        .from('product')
+        .update({'is_active': 0})
+        .eq('productid', id);
   }
 
-  Future<int> updateProduct({
+  Future<void> updateProduct({
     required String id,
     required String name,
-    required String category,
-    required int stock,
+    String? categoryId,
+    int? stock, // เปลี่ยนเป็น optional
     required double price,
-    required String unit,
+    double? markupPercentage, // เปลี่ยนเป็น optional
+    required String unitId,
     String? imagePath,
     String? warehouseId,
   }) async {
-    final data = {
-      _productNameColumnName: name,
-      _productCategoryColumnName: category,
-      _productTotalUnitColumnName: stock,
-      _productPriceColumnName: price,
-      _productUnitColumnName: unit,
-      _productImagePathColumnName: imagePath,
-      _productWarehouseIdColumnName: warehouseId,
+    final Map<String, dynamic> updateData = {
+      'productname': name,
+      'categoryid': categoryId,
+      'price': price,
+      'unitid': unitId,
+      'productimagepath': imagePath,
+      'warehouseid': warehouseId,
     };
-    if (kIsWeb) {
-      final index = _webMemoryDb.indexWhere(
-        (p) => p[_productIdColumnName] == id,
-      );
-      if (index != -1) {
-        final updatedData = Map<String, dynamic>.from(data);
-        updatedData[_productIdColumnName] = id;
-        _webMemoryDb[index] = updatedData;
-        return 1;
-      }
-      return 0;
+
+    if (markupPercentage != null) {
+      updateData['markup_percentage'] = markupPercentage;
     }
-    final db = await database;
-    if (db == null) return 0;
-    return await db.update(
-      _productTableName,
-      data,
-      where: '$_productIdColumnName = ?',
-      whereArgs: [id],
-    );
+
+    // อัปเดตสต็อกเฉพาะเมื่อมีการส่งมาเท่านั้น (ปกติจะไม่ส่งมาจากหน้า Edit หรือ PO)
+    if (stock != null) {
+      updateData['totalunit'] = stock;
+    }
+
+    await _supabase
+        .from('product')
+        .update(updateData)
+        .eq('productid', id);
   }
 
-  // --- SaleOrder, OrderDetail & Payment Methods ---
+  // --- SaleOrder & Debt Methods ---
   Future<String> saveOrder({
     required String date,
     required double totalAmount,
     required String paymentStatus,
-    required String paymentType,
+    String? paymentId,
     required List<Map<String, dynamic>> items,
     String? customerName,
     String? phone,
+    String? dueDate,
+    double? creditLimit,
   }) async {
     final orderId = 'ORD-${DateTime.now().millisecondsSinceEpoch}';
 
-    if (kIsWeb) {
-      final pType = _webPaymentTypeDb.firstWhere(
-        (p) => p['TypeName'] == paymentType,
-        orElse: () => _webPaymentTypeDb[0],
-      );
-      _webSaleOrderDb.add({
-        'OrderID': orderId,
-        'OrderDate': date,
-        'TotalAmount': totalAmount,
-        'PaymentStatus': paymentStatus,
-        'OrderStatus': 'Confirmed',
-        'PaymentID': pType['PaymentID'],
+    try {
+      await _supabase.from('saleorder').insert({
+        'order_id': orderId,
+        'orderdate': date,
+        'totalamount': totalAmount,
+        'paymentstatus': paymentStatus,
+        'status': 'Confirmed',
+        'paymentid': paymentId,
       });
+
+      // 1. รวบรวมข้อมูลสินค้าที่ถูกสั่งซื้อ (Grouping by productid)
+      final Map<String, double> productQtyMap = {};
+      final Map<String, double> productPriceMap = {};
       for (var item in items) {
-        _webOrderDetailDb.add({
-          'OrderID': orderId,
-          'ProductID': item['ProductID'],
-          'UnitPrice': item['UnitPrice'],
-          'Quantity': item['Quantity'],
+        final String pid = (item['productid'] ?? item['ProductID']).toString();
+        final double qty = (item['quantity'] ?? item['Quantity'] as num).toDouble();
+        final double price = (item['unit_price'] ?? item['UnitPrice'] ?? item['unitprice'] ?? 0).toDouble();
+        
+        productQtyMap[pid] = (productQtyMap[pid] ?? 0) + qty;
+        productPriceMap[pid] = price;
+      }
+
+      final List<String> productIds = productQtyMap.keys.toList();
+
+      final List<dynamic> allProductsRaw = await _supabase
+          .from('product')
+          .select('productid, totalunit')
+          .inFilter('productid', productIds);
+      
+      final Map<String, int> productStockMap = {
+        for (var p in allProductsRaw) p['productid'].toString(): (p['totalunit'] as num).toInt()
+      };
+
+      final List<dynamic> allBatchesRaw = await _supabase
+          .from('purchasedetail')
+          .select('*, purchaseorder(receivedate)')
+          .inFilter('productid', productIds)
+          .gt('quantity_remaining', 0)
+          .order('receivedate', referencedTable: 'purchaseorder', ascending: true);
+      
+      List<Map<String, dynamic>> localBatches = List<Map<String, dynamic>>.from(
+        allBatchesRaw.map((b) => Map<String, dynamic>.from(b))
+      );
+
+      List<Map<String, dynamic>> orderDetailsToInsert = [];
+      List<Map<String, dynamic>> stockTransactionsToInsert = [];
+      List<Map<String, dynamic>> batchUpdates = [];
+      List<Map<String, dynamic>> productUpdates = [];
+
+      final int baseTimestamp = DateTime.now().microsecondsSinceEpoch;
+      int itemIndex = 0;
+
+      for (String productId in productIds) {
+        double qtyToSell = productQtyMap[productId]!;
+        double unitPrice = productPriceMap[productId]!;
+
+        if (qtyToSell <= 0) continue;
+
+        double remainingToExit = qtyToSell;
+        double totalCostForThisItem = 0;
+
+        for (var batch in localBatches) {
+          if (batch['productid'] != productId || remainingToExit <= 0.0001) continue;
+
+          double batchRemaining = (batch['quantity_remaining'] as num).toDouble();
+          double batchCostPrice = (batch['unitprice'] as num).toDouble();
+          double takeFromBatch = 0;
+
+          if (batchRemaining <= remainingToExit) {
+            takeFromBatch = batchRemaining;
+            remainingToExit -= batchRemaining;
+            batch['quantity_remaining'] = 0;
+          } else {
+            takeFromBatch = remainingToExit;
+            batch['quantity_remaining'] = batchRemaining - takeFromBatch;
+            remainingToExit = 0;
+          }
+
+          if (takeFromBatch > 0) {
+            batchUpdates.add({
+              'poid': batch['poid'],
+              'productid': productId,
+              'quantity_remaining': batch['quantity_remaining'],
+              'unitprice': batch['unitprice'],
+            });
+            totalCostForThisItem += (takeFromBatch * batchCostPrice);
+          }
+        }
+
+        double finalCostPrice = (qtyToSell - remainingToExit) > 0
+            ? (totalCostForThisItem / (qtyToSell - remainingToExit))
+            : 0;
+
+        orderDetailsToInsert.add({
+          'order_id': orderId,
+          'productid': productId,
+          'unit_price': unitPrice,
+          'quantity': qtyToSell,
+          'cost_price': finalCostPrice,
+        });
+
+        if (productStockMap.containsKey(productId)) {
+          int currentStock = productStockMap[productId]!;
+          int newStock = currentStock - qtyToSell.round();
+          if (newStock < 0) newStock = 0;
+
+          debugPrint('DEBUG: Stock Update for $productId: $currentStock -> $newStock (qty: $qtyToSell)');
+          productUpdates.add({'productid': productId, 'totalunit': newStock});
+
+          stockTransactionsToInsert.add({
+            'transaction_id': 'TX-${baseTimestamp + itemIndex}',
+            'productid': productId,
+            'type': 'OUT',
+            'quantity': qtyToSell,
+            'balance_after': newStock,
+            'cost_price': finalCostPrice,
+            'reference_id': orderId,
+            'created_at': DateTime.now().toIso8601String(),
+            'remarks': 'ขายสินค้าบิล $orderId (FIFO)',
+          });
+          itemIndex++;
+        }
+      }
+
+      final List<Future> dbOperations = [];
+      if (orderDetailsToInsert.isNotEmpty) {
+        dbOperations.add(_supabase.from('orderdetail').insert(orderDetailsToInsert));
+      }
+      if (stockTransactionsToInsert.isNotEmpty) {
+        dbOperations.add(_supabase.from('stock_transaction').insert(stockTransactionsToInsert));
+      }
+      if (batchUpdates.isNotEmpty) {
+        dbOperations.add(_supabase.from('purchasedetail').upsert(batchUpdates));
+      }
+      if (productUpdates.isNotEmpty) {
+        dbOperations.add(_supabase.from('product').upsert(productUpdates));
+      }
+
+      await Future.wait(dbOperations).timeout(const Duration(seconds: 30));
+
+      // 5. จัดการข้อมูลลูกค้า (บันทึกทุกกรณีที่มีชื่อลูกค้า เพื่อเก็บเป็นฐานข้อมูล)
+      int? finalCustomerId;
+      if (customerName != null && customerName.isNotEmpty) {
+        final cleanPhone = phone?.trim() ?? '';
+
+        Map<String, dynamic>? existing;
+        // ค้นหาลูกค้าเดิม (เฉพาะกรณีที่มีเบอร์โทรศัพท์เท่านั้น)
+        if (cleanPhone.isNotEmpty) {
+          final results = await _supabase
+              .from('customer')
+              .select('customerid')
+              .eq('customerphone', cleanPhone)
+              .limit(1);
+
+          if (results != null && (results as List).isNotEmpty) {
+            existing = results[0];
+          }
+        }
+
+        if (existing != null) {
+          finalCustomerId = existing['customerid'];
+        } else {
+          try {
+            // ดึง ID สูงสุดมาบวก 1
+            final lastCustomer = await _supabase
+                .from('customer')
+                .select('customerid')
+                .order('customerid', ascending: false)
+                .limit(1)
+                .maybeSingle();
+
+            int nextId;
+            if (lastCustomer != null) {
+              nextId = int.parse(lastCustomer['customerid'].toString()) + 1;
+            } else {
+              nextId = (DateTime.now().millisecondsSinceEpoch % 1000000) + 1000;
+            }
+
+            final newCustomer = await _supabase
+                .from('customer')
+                .insert({
+                  'customerid': nextId,
+                  'customername': customerName,
+                  'customerphone': cleanPhone,
+                  'credit_limit': creditLimit ?? 0.0,
+                })
+                .select('customerid')
+                .maybeSingle();
+
+            finalCustomerId = newCustomer != null
+                ? newCustomer['customerid']
+                : nextId;
+          } catch (e) {
+            debugPrint('Error creating customer: $e');
+            // กรณีสร้างไม่สำเร็จ (เช่น เบอร์ซ้ำที่ไม่ได้ตรวจเจอตอนแรก) ให้ลองหาด้วยเบอร์อีกครั้ง
+            if (cleanPhone.isNotEmpty) {
+              final retry = await _supabase
+                  .from('customer')
+                  .select('customerid')
+                  .eq('customerphone', cleanPhone)
+                  .maybeSingle();
+              finalCustomerId = retry?['customerid'];
+            }
+          }
+        }
+      }
+
+      // 6. จัดการข้อมูลหนี้สิน (เฉพาะกรณีขายเชื่อ)
+      if (paymentStatus == 'ขายเชื่อ (ค้างชำระ)' ||
+          paymentStatus == 'ค้างชำระ') {
+        // สร้างรหัสหนี้ที่สั้นลงและปลอดภัย
+        final debtId =
+            'D${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
+        await _supabase.from('debtrecord').insert({
+          'debtid': debtId,
+          'order_id': orderId,
+          'debtstatus': 'Pending',
+          'debtrecordstatus': 'Confirmed',
+          'originalamount': totalAmount,
+          'remainingamount': totalAmount,
+          'startdate': date,
+          'due_date': dueDate,
+          'customerid': finalCustomerId,
         });
       }
+
       return orderId;
+    } catch (e) {
+      debugPrint('Error in saveOrder: $e');
+      rethrow;
     }
-
-    final db = await database;
-    if (db == null) return "";
-
-    return await db.transaction((txn) async {
-      final List<Map<String, dynamic>> pTypes = await txn.query(
-        _paymentTypeTableName,
-        where: '$_paymentTypeNameColumnName = ?',
-        whereArgs: [paymentType],
-      );
-      String paymentId = pTypes.isNotEmpty
-          ? pTypes.first[_paymentIdColumnName]
-          : "PAY1";
-
-      await txn.insert(_saleOrderTableName, {
-        _orderIdColumnName: orderId,
-        _orderDateColumnName: date,
-        _orderTotalAmountColumnName: totalAmount,
-        _orderPaymentStatusColumnName: paymentStatus,
-        _orderStatusColumnName: 'Confirmed',
-        _orderPaymentIdColumnName: paymentId,
-      });
-
-      for (var item in items) {
-        await txn.insert(_orderDetailTableName, {
-          _orderIdColumnName: orderId,
-          _productIdColumnName: item['ProductID'],
-          _detailUnitPriceColumnName: item['UnitPrice'],
-          _detailQuantityColumnName: item['Quantity'],
-        });
-        await txn.execute(
-          '''
-          UPDATE $_productTableName SET $_productTotalUnitColumnName = $_productTotalUnitColumnName - ? WHERE $_productIdColumnName = ?
-        ''',
-          [item['Quantity'], item['ProductID']],
-        );
-      }
-
-      // บันทึกลูกหนี้ ถ้าเป็น "ค้างชำระ"
-      if (paymentStatus == 'ค้างชำระ') {
-        final debtId = 'DBT-${DateTime.now().millisecondsSinceEpoch}';
-        await txn.insert(_debtRecordTableName, {
-          _debtIdColumnName: debtId,
-          _orderIdColumnName: orderId,
-          _debtStatusColumnName: 'Pending',
-          _debtRecordStatusColumnName: 'Confirmed',
-          _debtOriginalAmountColumnName: totalAmount,
-          _debtRemainingAmountColumnName: totalAmount,
-          _debtStartDateColumnName: date,
-          _debtCustomerNameColumnName: customerName,
-          _debtPhoneColumnName: phone,
-        });
-      }
-
-      return orderId;
-    });
   }
 
   Future<List<Map<String, dynamic>>> getOrders() async {
-    if (kIsWeb) {
-      return _webSaleOrderDb.map((order) {
-        final payment = _webPaymentTypeDb.firstWhere(
-          (p) => p['PaymentID'] == order['PaymentID'],
-          orElse: () => {},
-        );
-        return {...order, 'TypeName': payment['TypeName'] ?? 'ไม่ระบุ'};
-      }).toList();
-    }
-    final db = await database;
-    if (db == null) return [];
-    return await db.rawQuery('''
-      SELECT o.*, p.$_paymentTypeNameColumnName, d.$_debtCustomerNameColumnName, d.$_debtPhoneColumnName
-      FROM $_saleOrderTableName o
-      LEFT JOIN $_paymentTypeTableName p ON o.$_orderPaymentIdColumnName = p.$_paymentIdColumnName
-      LEFT JOIN $_debtRecordTableName d ON o.$_orderIdColumnName = d.$_orderIdColumnName
-      ORDER BY o.$_orderDateColumnName DESC
-    ''');
+    return await _supabase
+        .from('saleorder')
+        .select('''
+      *,
+      paymenttype (paymentname),
+      debtrecord (
+        *,
+        customer (customername, customerphone)
+      )
+    ''')
+        .order('orderdate', ascending: false);
   }
 
   Future<List<Map<String, dynamic>>> getOrderDetails(String orderId) async {
-    if (kIsWeb) {
-      final details = _webOrderDetailDb
-          .where((d) => d['OrderID'] == orderId)
-          .toList();
-      return details.map((d) {
-        final product = _webMemoryDb.firstWhere(
-          (p) => p['ProductID'] == d['ProductID'],
-          orElse: () => {},
-        );
-        return {...d, 'ProductName': product['ProductName'] ?? 'Unknown'};
-      }).toList();
-    }
-    final db = await database;
-    if (db == null) return [];
-    return await db.rawQuery(
-      '''
-      SELECT d.*, p.$_productNameColumnName, p.$_productUnitColumnName
-      FROM $_orderDetailTableName d
-      JOIN $_productTableName p ON d.$_productIdColumnName = p.$_productIdColumnName
-      WHERE d.$_orderIdColumnName = ?
-    ''',
-      [orderId],
-    );
+    return await _supabase
+        .from('orderdetail')
+        .select('''
+      *,
+      product (productid, productname, unitid, productunit (unitname))
+    ''')
+        .eq('order_id', orderId);
   }
 
   Future<bool> cancelOrder(String orderId) async {
-    if (kIsWeb) {
-      final index = _webSaleOrderDb.indexWhere((o) => o['OrderID'] == orderId);
-      if (index != -1 && _webSaleOrderDb[index]['OrderStatus'] == 'Confirmed') {
-        _webSaleOrderDb[index]['OrderStatus'] = 'Cancelled';
-        final details = _webOrderDetailDb.where((d) => d['OrderID'] == orderId);
-        for (var d in details) {
-          final pIndex = _webMemoryDb.indexWhere(
-            (p) => p['ProductID'] == d['ProductID'],
-          );
-          if (pIndex != -1) {
-            _webMemoryDb[pIndex]['TotalUnit'] += d['Quantity'];
-          }
+    try {
+      await _supabase
+          .from('saleorder')
+          .update({'status': 'Cancelled'})
+          .eq('order_id', orderId);
+      await _supabase
+          .from('debtrecord')
+          .update({'debtrecordstatus': 'Cancelled'})
+          .eq('order_id', orderId);
+
+      final details = await getOrderDetails(orderId);
+      final int baseTimestamp = DateTime.now().microsecondsSinceEpoch;
+      int itemIndex = 0;
+      for (var item in details) {
+        final String productId = item['productid'];
+        final double qty = (item['quantity'] as num).toDouble();
+
+        final productResponse = await _supabase
+            .from('product')
+            .select('totalunit')
+            .eq('productid', productId)
+            .single();
+
+        final int currentStock = (productResponse['totalunit'] as num).toInt();
+        final int newStock = currentStock + qty.round();
+
+        await _supabase
+            .from('product')
+            .update({'totalunit': newStock})
+            .eq('productid', productId);
+
+        final latestBatch = await _supabase
+            .from('purchasedetail')
+            .select('poid, quantity_remaining')
+            .eq('productid', productId)
+            .order('poid', ascending: false)
+            .limit(1)
+            .maybeSingle();
+
+        if (latestBatch != null) {
+          double currentRemaining = (latestBatch['quantity_remaining'] as num)
+              .toDouble();
+          await _supabase
+              .from('purchasedetail')
+              .update({'quantity_remaining': currentRemaining + qty})
+              .eq('poid', latestBatch['poid'])
+              .eq('productid', productId);
         }
-        return true;
+
+        await _supabase.from('stock_transaction').insert({
+          'transaction_id': 'TX-${baseTimestamp + itemIndex}',
+          'productid': productId,
+          'type': 'ADJ_IN',
+          'quantity': qty,
+          'balance_after': newStock,
+          'reference_id': orderId,
+          'created_at': DateTime.now().toIso8601String(),
+          'remarks': 'ยกเลิกบิลขาย $orderId (คืนสต็อกเข้าล็อตล่าสุด)',
+        });
+        itemIndex++;
       }
+      return true;
+    } catch (e) {
+      debugPrint('Error cancelling order: $e');
       return false;
     }
+  }
 
-    final db = await database;
-    if (db == null) return false;
+  // --- Payment & Purchase Type Methods ---
+  Future<List<Map<String, dynamic>>> getPaymentTypes() async {
+    return await _supabase.from('paymenttype').select();
+  }
 
-    return await db.transaction((txn) async {
-      final List<Map<String, dynamic>> order = await txn.query(
-        _saleOrderTableName,
-        where: '$_orderIdColumnName = ? AND $_orderStatusColumnName = ?',
-        whereArgs: [orderId, 'Confirmed'],
-      );
-
-      if (order.isEmpty) return false;
-
-      await txn.update(
-        _saleOrderTableName,
-        {_orderStatusColumnName: 'Cancelled'},
-        where: '$_orderIdColumnName = ?',
-        whereArgs: [orderId],
-      );
-
-      // อัปเดตสถานะใน DebtRecord เป็น Cancelled ด้วย (ถ้ามี)
-      await txn.update(
-        _debtRecordTableName,
-        {_debtRecordStatusColumnName: 'Cancelled'},
-        where: '$_orderIdColumnName = ?',
-        whereArgs: [orderId],
-      );
-
-      final List<Map<String, dynamic>> details = await txn.query(
-        _orderDetailTableName,
-        where: '$_orderIdColumnName = ?',
-        whereArgs: [orderId],
-      );
-
-      for (var item in details) {
-        await txn.execute(
-          '''
-          UPDATE $_productTableName 
-          SET $_productTotalUnitColumnName = $_productTotalUnitColumnName + ? 
-          WHERE $_productIdColumnName = ?
-        ''',
-          [item['Quantity'], item['ProductID']],
-        );
-      }
-
-      return true;
-    });
+  Future<List<Map<String, dynamic>>> getPurchaseTypes() async {
+    return await _supabase.from('purchasetype').select();
   }
 
   // --- PurchaseOrder Methods ---
@@ -829,92 +677,148 @@ class DatabaseService {
     required double totalCost,
     required List<Map<String, dynamic>> items,
     String? billImagePath,
-    required String purchaseType,
+    String? ptId,
     required String paymentStatus,
     String? supplierId,
+    String? dueDate,
   }) async {
     final poId = 'PO-${DateTime.now().millisecondsSinceEpoch}';
 
-    final db = await database;
-    if (db == null) return "";
+    await _supabase.from('purchaseorder').insert({
+      'poid': poId,
+      'receivedate': receiveDate,
+      'totalcost': totalCost,
+      'paidamount': paymentStatus == 'Paid' ? totalCost : 0,
+      'billimagepath': billImagePath,
+      'status': 'Confirmed',
+      'paymentstatus': paymentStatus,
+      'ptid': ptId,
+      'supplier_id': supplierId,
+      'due_date': dueDate,
+    });
 
-    return await db.transaction((txn) async {
-      final List<Map<String, dynamic>> ptTypes = await txn.query(
-        _purchaseTypeTableName,
-        where: '$_ptNameColumnName = ?',
-        whereArgs: [purchaseType],
-      );
-      String ptId = ptTypes.isNotEmpty ? ptTypes.first[_ptIdColumnName] : "PT1";
+    final int baseTimestamp = DateTime.now().microsecondsSinceEpoch;
+    int itemIndex = 0;
+    for (var item in items) {
+      final String productId = item['productid'] ?? item['ProductID'];
+      final double qty = (item['quantity'] ?? item['Quantity'] as num)
+          .toDouble();
+      final double unitPrice = (item['unitprice'] ?? item['UnitPrice'] ?? 0)
+          .toDouble();
 
-      await txn.insert(_purchaseOrderTableName, {
-        _poIdColumnName: poId,
-        _poReceiveDateColumnName: receiveDate,
-        _poTotalCostColumnName: totalCost,
-        _poPaidAmountColumnName: paymentStatus == 'Paid' ? totalCost : 0,
-        _poBillImagePathColumnName: billImagePath,
-        _poStatusColumnName: 'Confirmed',
-        _poPaymentStatusColumnName: paymentStatus,
-        _poTypeIdColumnName: ptId,
-        _poSupplierIdColumnName: supplierId,
+      await _supabase.from('purchasedetail').insert({
+        'poid': poId,
+        'productid': productId,
+        'unitprice': unitPrice,
+        'quantity': qty,
+        'quantity_remaining': qty,
       });
 
-      for (var item in items) {
-        await txn.insert(_purchaseDetailTableName, {
-          _poIdColumnName: poId,
-          _productIdColumnName: item['ProductID'],
-          _detailUnitPriceColumnName: item['UnitPrice'],
-          _detailQuantityColumnName: item['Quantity'],
-        });
-        await txn.execute(
-          '''
-          UPDATE $_productTableName SET $_productTotalUnitColumnName = $_productTotalUnitColumnName + ? WHERE $_productIdColumnName = ?
-        ''',
-          [item['Quantity'], item['ProductID']],
-        );
-      }
-      return poId;
-    });
+      final productResponse = await _supabase
+          .from('product')
+          .select('totalunit')
+          .eq('productid', productId)
+          .single();
+
+      final int currentStock = (productResponse['totalunit'] as num).toInt();
+      final int newStock = currentStock + qty.round();
+
+      await _supabase
+          .from('product')
+          .update({'totalunit': newStock})
+          .eq('productid', productId);
+
+      await _supabase.from('stock_transaction').insert({
+        'transaction_id': 'TX-${baseTimestamp + itemIndex}',
+        'productid': productId,
+        'type': 'IN',
+        'quantity': qty,
+        'balance_after': newStock,
+        'cost_price': unitPrice,
+        'reference_id': poId,
+        'created_at': DateTime.now().toIso8601String(),
+        'remarks': 'ซื้อสินค้าเข้าบิล $poId',
+      });
+      itemIndex++;
+    }
+
+    return poId;
+  }
+
+  Future<List<Map<String, dynamic>>> getPurchaseOrders() async {
+    return await _supabase
+        .from('purchaseorder')
+        .select('''
+      *,
+      purchasetype (ptname),
+      supplier (supplier_name)
+    ''')
+        .order('receivedate', ascending: false);
+  }
+
+  Future<List<Map<String, dynamic>>> getPurchaseOrderDetails(
+    String poId,
+  ) async {
+    return await _supabase
+        .from('purchasedetail')
+        .select('''
+      *,
+      product (productid, productname, unitid, productunit (unitname))
+    ''')
+        .eq('poid', poId);
   }
 
   Future<bool> cancelPurchaseOrder(String poId) async {
-    final db = await database;
-    if (db == null) return false;
+    try {
+      await _supabase
+          .from('purchaseorder')
+          .update({'status': 'Cancelled'})
+          .eq('poid', poId);
 
-    return await db.transaction((txn) async {
-      final List<Map<String, dynamic>> po = await txn.query(
-        _purchaseOrderTableName,
-        where: '$_poIdColumnName = ? AND $_poStatusColumnName = ?',
-        whereArgs: [poId, 'Confirmed'],
-      );
-
-      if (po.isEmpty) return false;
-
-      await txn.update(
-        _purchaseOrderTableName,
-        {_poStatusColumnName: 'Cancelled'},
-        where: '$_poIdColumnName = ?',
-        whereArgs: [poId],
-      );
-
-      final List<Map<String, dynamic>> details = await txn.query(
-        _purchaseDetailTableName,
-        where: '$_poIdColumnName = ?',
-        whereArgs: [poId],
-      );
-
+      final details = await getPurchaseOrderDetails(poId);
+      final int baseTimestamp = DateTime.now().microsecondsSinceEpoch;
+      int itemIndex = 0;
       for (var item in details) {
-        await txn.execute(
-          '''
-          UPDATE $_productTableName 
-          SET $_productTotalUnitColumnName = $_productTotalUnitColumnName - ? 
-          WHERE $_productIdColumnName = ?
-        ''',
-          [item['Quantity'], item['ProductID']],
-        );
-      }
+        final String productId = item['productid'];
+        final double qty = (item['quantity'] as num).toDouble();
 
+        final productResponse = await _supabase
+            .from('product')
+            .select('totalunit')
+            .eq('productid', productId)
+            .single();
+
+        final int currentStock = (productResponse['totalunit'] as num).toInt();
+        final int newStock = currentStock - qty.round();
+
+        await _supabase
+            .from('product')
+            .update({'totalunit': newStock < 0 ? 0 : newStock})
+            .eq('productid', productId);
+
+        await _supabase
+            .from('purchasedetail')
+            .update({'quantity_remaining': 0})
+            .eq('poid', poId)
+            .eq('productid', productId);
+
+        await _supabase.from('stock_transaction').insert({
+          'transaction_id': 'TX-${baseTimestamp + itemIndex}',
+          'productid': productId,
+          'type': 'ADJ_OUT',
+          'quantity': qty,
+          'balance_after': newStock < 0 ? 0 : newStock,
+          'reference_id': poId,
+          'created_at': DateTime.now().toIso8601String(),
+          'remarks': 'ยกเลิกบิลซื้อ $poId',
+        });
+        itemIndex++;
+      }
       return true;
-    });
+    } catch (e) {
+      debugPrint('Error cancelling purchase order: $e');
+      return false;
+    }
   }
 
   Future<bool> addPurchasePayment({
@@ -922,105 +826,77 @@ class DatabaseService {
     required double amount,
     String? imagePath,
   }) async {
-    final db = await database;
-    if (db == null) return false;
+    try {
+      final po = await _supabase
+          .from('purchaseorder')
+          .select()
+          .eq('poid', poId)
+          .single();
 
-    return await db.transaction((txn) async {
-      final List<Map<String, dynamic>> poResults = await txn.query(
-        _purchaseOrderTableName,
-        where: '$_poIdColumnName = ?',
-        whereArgs: [poId],
-      );
-      if (poResults.isEmpty) return false;
-      final po = poResults.first;
-
-      await txn.insert(_creditPaymentHistoryTableName, {
-        _poIdColumnName: poId,
-        _cphAmountPaidColumnName: amount,
-        _cphPaidDateColumnName: DateTime.now().toIso8601String(),
-        _cphPaidImagePathColumnName: imagePath,
+      await _supabase.from('creditpaymenthistory').insert({
+        'poid': poId,
+        'amountpaid': amount,
+        'paiddate': DateTime.now().toIso8601String(),
+        'paidimagepath': imagePath,
       });
 
-      final double currentPaid = (po[_poPaidAmountColumnName] as num)
-          .toDouble();
-      final double totalCost = (po[_poTotalCostColumnName] as num).toDouble();
+      final double currentPaid = (po['paidamount'] as num).toDouble();
+      final double totalCost = (po['totalcost'] as num).toDouble();
       final double newPaid = currentPaid + amount;
 
-      final Map<String, dynamic> updateData = {
-        _poPaidAmountColumnName: newPaid,
-      };
+      final Map<String, dynamic> updateData = {'paidamount': newPaid};
 
       if (newPaid >= totalCost) {
-        updateData[_poPaymentStatusColumnName] = 'Paid';
+        updateData['paymentstatus'] = 'Paid';
       }
 
-      await txn.update(
-        _purchaseOrderTableName,
-        updateData,
-        where: '$_poIdColumnName = ?',
-        whereArgs: [poId],
-      );
-
+      await _supabase.from('purchaseorder').update(updateData).eq('poid', poId);
       return true;
-    });
+    } catch (e) {
+      debugPrint('Error adding purchase payment: $e');
+      return false;
+    }
   }
 
   Future<bool> payPurchaseDebt(String poId) async {
-    final db = await database;
-    if (db == null) return false;
+    try {
+      final po = await _supabase
+          .from('purchaseorder')
+          .select()
+          .eq('poid', poId)
+          .single();
+      final double totalCost = (po['totalcost'] as num).toDouble();
+      final double currentPaid = (po['paidamount'] as num).toDouble();
+      final double balance = totalCost - currentPaid;
 
-    final poResults = await db.query(
-      _purchaseOrderTableName,
-      where: '$_poIdColumnName = ?',
-      whereArgs: [poId],
-    );
-    if (poResults.isEmpty) return false;
-    final totalCost = (poResults.first[_poTotalCostColumnName] as num)
-        .toDouble();
-    final currentPaid = (poResults.first[_poPaidAmountColumnName] as num)
-        .toDouble();
-    final balance = totalCost - currentPaid;
-
-    if (balance <= 0) return true;
-
-    return await addPurchasePayment(poId: poId, amount: balance);
+      if (balance <= 0) return true;
+      return await addPurchasePayment(poId: poId, amount: balance);
+    } catch (e) {
+      debugPrint('Error paying purchase debt: $e');
+      return false;
+    }
   }
 
   Future<List<Map<String, dynamic>>> getPurchasePaymentHistory(
     String poId,
   ) async {
-    final db = await database;
-    if (db == null) return [];
-    return await db.query(
-      _creditPaymentHistoryTableName,
-      where: '$_poIdColumnName = ?',
-      whereArgs: [poId],
-      orderBy: '$_cphPaidDateColumnName DESC',
-    );
+    return await _supabase
+        .from('creditpaymenthistory')
+        .select()
+        .eq('poid', poId)
+        .order('paiddate', ascending: false);
   }
 
-  Future<List<Map<String, dynamic>>> getPurchaseOrders() async {
-    final db = await database;
-    if (db == null) return [];
-    return await db.rawQuery('''
-      SELECT po.*, pt.$_ptNameColumnName, s.$_supplierNameColumnName
-      FROM $_purchaseOrderTableName po
-      LEFT JOIN $_purchaseTypeTableName pt ON po.$_poTypeIdColumnName = pt.$_ptIdColumnName
-      LEFT JOIN $_supplierTableName s ON po.$_poSupplierIdColumnName = s.$_supplierIdColumnName
-      ORDER BY po.$_poReceiveDateColumnName DESC
-    ''');
-  }
-
-  // --- DebtRecord & DebtPaymentHistory Methods (ลูกหนี้) ---
+  // --- Debt Payment Methods ---
   Future<List<Map<String, dynamic>>> getDebtRecords() async {
-    final db = await database;
-    if (db == null) return [];
-    return await db.query(
-      _debtRecordTableName,
-      where: '$_debtRecordStatusColumnName = ?',
-      whereArgs: ['Confirmed'],
-      orderBy: '$_debtStartDateColumnName DESC',
-    );
+    return await _supabase
+        .from('debtrecord')
+        .select('''
+          *,
+          customer (customername, customerphone)
+        ''')
+        .eq('debtrecordstatus', 'Confirmed')
+        .order('startdate', ascending: false);
   }
 
   Future<bool> addDebtPayment({
@@ -1028,86 +904,54 @@ class DatabaseService {
     required double amount,
     String? imagePath,
   }) async {
-    final db = await database;
-    if (db == null) return false;
+    try {
+      final debt = await _supabase
+          .from('debtrecord')
+          .select()
+          .eq('debtid', debtId)
+          .single();
 
-    return await db.transaction((txn) async {
-      // 1. ตรวจสอบข้อมูลลูกหนี้
-      final List<Map<String, dynamic>> debtResults = await txn.query(
-        _debtRecordTableName,
-        where: '$_debtIdColumnName = ?',
-        whereArgs: [debtId],
-      );
-      if (debtResults.isEmpty) return false;
-      final debt = debtResults.first;
-
-      // 2. บันทึกลงตาราง DeptPaymentHistory
-      await txn.insert(_debtPaymentHistoryTableName, {
-        _debtIdColumnName: debtId,
-        _dphAmountPaidColumnName: amount,
-        _dphPaidDateColumnName: DateTime.now().toIso8601String(),
-        _dphPaidImagePathColumnName: imagePath,
+      await _supabase.from('deptpaymenthistory').insert({
+        'debtid': debtId,
+        'amountpaid': amount,
+        'paiddate': DateTime.now().toIso8601String(),
+        'deptpaidimagepath': imagePath,
       });
 
-      // 3. อัปเดตยอดคงเหลือใน DebtRecord
-      final double currentRemaining =
-          (debt[_debtRemainingAmountColumnName] as num).toDouble();
+      final double currentRemaining = (debt['remainingamount'] as num)
+          .toDouble();
       final double newRemaining = currentRemaining - amount;
 
       final Map<String, dynamic> updateData = {
-        _debtRemainingAmountColumnName: newRemaining < 0 ? 0 : newRemaining,
+        'remainingamount': newRemaining < 0 ? 0 : newRemaining,
       };
 
-      // 4. ถ้าจ่ายครบ (หรือเกิน) ให้เปลี่ยน DeptStatus เป็น Paid
       if (newRemaining <= 0) {
-        updateData[_debtStatusColumnName] = 'Paid';
-
-        // อัปเดตสถานะใน SaleOrder หลักด้วย
-        await txn.update(
-          _saleOrderTableName,
-          {_orderPaymentStatusColumnName: 'ชำระแล้ว'},
-          where: '$_orderIdColumnName = ?',
-          whereArgs: [debt[_orderIdColumnName]],
-        );
+        updateData['debtstatus'] = 'Paid';
+        await _supabase
+            .from('saleorder')
+            .update({'paymentstatus': 'ชำระแล้ว'})
+            .eq('order_id', debt['order_id']);
       }
 
-      await txn.update(
-        _debtRecordTableName,
-        updateData,
-        where: '$_debtIdColumnName = ?',
-        whereArgs: [debtId],
-      );
-
+      await _supabase
+          .from('debtrecord')
+          .update(updateData)
+          .eq('debtid', debtId);
       return true;
-    });
+    } catch (e) {
+      debugPrint('Error adding debt payment: $e');
+      return false;
+    }
   }
 
   Future<List<Map<String, dynamic>>> getDebtPaymentHistory(
     String debtId,
   ) async {
-    final db = await database;
-    if (db == null) return [];
-    return await db.query(
-      _debtPaymentHistoryTableName,
-      where: '$_debtIdColumnName = ?',
-      whereArgs: [debtId],
-      orderBy: '$_dphPaidDateColumnName DESC',
-    );
-  }
-
-  Future<List<Map<String, dynamic>>> getPurchaseOrderDetails(
-    String poId,
-  ) async {
-    final db = await database;
-    if (db == null) return [];
-    return await db.rawQuery(
-      '''
-      SELECT d.*, p.$_productNameColumnName, p.$_productUnitColumnName
-      FROM $_purchaseDetailTableName d
-      JOIN $_productTableName p ON d.$_productIdColumnName = p.$_productIdColumnName
-      WHERE d.$_poIdColumnName = ?
-    ''',
-      [poId],
-    );
+    return await _supabase
+        .from('deptpaymenthistory')
+        .select()
+        .eq('debtid', debtId)
+        .order('paiddate', ascending: false);
   }
 }
